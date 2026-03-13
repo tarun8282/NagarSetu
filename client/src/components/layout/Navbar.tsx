@@ -26,7 +26,7 @@ const Navbar: React.FC = () => {
   return (
     <nav className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl sticky top-0 z-50 border-b border-slate-200/50 dark:border-slate-800/50 transition-colors duration-300">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-1 text-2xl font-bold font-deva italic">
+        <Link to="/" className="flex items-center gap-1 text-2xl font-bold font-deva italic px-3 py-1 border border-slate-200 dark:border-slate-800 rounded-lg hover:border-saffron/50 transition-colors">
           <span className="text-saffron">Nagar</span><span className="text-india-green">Setu</span>
         </Link>
 

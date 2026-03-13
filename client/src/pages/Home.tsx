@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, MapPin, ShieldCheck, Clock } from 'lucide-react';
+import { AnimatedText } from '../components/ui/animated-underline-text-one';
 
 const Home: React.FC = () => {
   return (
@@ -23,9 +24,12 @@ const Home: React.FC = () => {
         <div className="relative max-w-7xl mx-auto grid md:grid-cols-[1fr,400px] gap-12 items-center z-10">
           {/* Left Column (Content) */}
           <div className="text-center md:text-left space-y-6">
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white font-deva">
-              <span className="text-saffron">Nagar</span><span className="text-india-green">Setu</span>
-            </h1>
+            <AnimatedText 
+              text="NagarSetu" 
+              className="md:items-start"
+              textClassName="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-[#FF9933] to-[#128807] bg-clip-text text-transparent italic font-deva [text-shadow:_0_1px_0_rgb(0_0_0_/_5%)]"
+              underlineClassName="text-navy-blue dark:text-saffron-400"
+            />
             <p className="text-2xl text-slate-600 dark:text-slate-400/90 font-medium italic font-deva">
               Connecting citizens to municipal care.
             </p>
