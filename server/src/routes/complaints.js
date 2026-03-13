@@ -33,9 +33,11 @@ router.post('/', upload.array('media', 5), async (req, res) => {
                 latitude,
                 longitude,
                 address: geoInfo.fullAddress,
-                city_id: req.body.city_id, // Should come from profile or geocode
+                city_id: req.body.city_id,
                 state_id: req.body.state_id,
-                status: 'ai_processing'
+                status: 'ai_processing',
+                priority: 'medium', // Default priority while AI is processing
+                category: 'pending'
             })
             .select()
             .single();
@@ -131,21 +133,19 @@ async function processAIClassification(complaint, mediaFiles) {
 
 /**
  * @route GET /api/complaints
- * @desc Get all complaints for a citizen
+ * @desc Get complaints - all if no citizen_id, or specific citizen's if citizen_id provided
  */
 router.get('/', async (req, res) => {
     try {
         const { citizen_id } = req.query;
 
-        if (!citizen_id) {
-            return res.status(400).json({ success: false, error: 'citizen_id is required' });
+        let query = supabase.from('complaints').select('*');
+
+        if (citizen_id) {
+            query = query.eq('citizen_id', citizen_id);
         }
 
-        const { data: complaints, error } = await supabase
-            .from('complaints')
-            .select('*')
-            .eq('citizen_id', citizen_id)
-            .order('created_at', { ascending: false });
+        const { data: complaints, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
