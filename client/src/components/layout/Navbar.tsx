@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Home, PlusCircle, LayoutDashboard, Map, LogOut, Menu, Sun, Moon, PhoneCall } from 'lucide-react';
+import LanguageSelector from './LanguageSelector';
 
 // Reusable SOS button — navigates to the dedicated Emergency page
 const SOSButton: React.FC = () => (
@@ -43,9 +44,7 @@ const Navbar: React.FC = () => {
           <Link to="/" className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-saffron transition-colors">
             <Home size={18} /> Home
           </Link>
-          <Link to="/heatmap" className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-saffron transition-colors">
-            <Map size={18} /> Heatmap
-          </Link>
+          <LanguageSelector />
 
           {user ? (
             <>
@@ -90,7 +89,7 @@ const Navbar: React.FC = () => {
       {isMenuOpen && (
         <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 flex flex-col gap-4 animate-in slide-in-from-top duration-300">
           <Link to="/" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><Home size={18} /> Home</Link>
-          <Link to="/heatmap" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><Map size={18} /> Heatmap</Link>
+          <LanguageSelector />
           {user && (
             <>
               <Link to="/dashboard" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><LayoutDashboard size={18} /> Dashboard</Link>
