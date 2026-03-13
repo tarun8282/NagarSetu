@@ -227,7 +227,7 @@ export const citizenLogin = async (
  * Admin/Officer login with email and password
  */
 export const adminLogin = async (
-  email: string,
+  username: string,
   password: string
 ): Promise<SignUpResponse> => {
   try {
@@ -237,7 +237,7 @@ export const adminLogin = async (
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email,
+        username,
         password,
       }),
     });

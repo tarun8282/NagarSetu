@@ -5,7 +5,11 @@ const { supabase } = require('../lib/supabase');
 const { generateOTP, sendOTPEmail, sendWelcomeEmail, initializeTransporter } = require('../services/mail.service');
 
 // Initialize mail transporter on startup
-initializeTransporter();
+try {
+  initializeTransporter();
+} catch (error) {
+  console.error('[Mail Service] Critical initialization failure:', error.message);
+}
 
 // In-memory OTP storage (use Redis in production)
 const otpStore = new Map();
@@ -184,7 +188,7 @@ router.post(
       let existingAuthUser = null;
       const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
       
-      if (!listError && userList.users) {
+      if (!listError && userList && userList.users) {
         existingAuthUser = userList.users.find(u => u.email === email);
       }
 
@@ -334,13 +338,13 @@ router.post(
 
 /**
  * @route POST /api/auth/admin/login
- * @desc Login for admin/officer (password-based)
+ * @desc Login for admin/officer, states, and cities (password-based)
  * @access Public
  */
 router.post(
   '/admin/login',
   [
-    body('email').isEmail().normalizeEmail(),
+    body('username').notEmpty().trim(),
     body('password').notEmpty(),
   ],
   async (req, res) => {
@@ -350,18 +354,73 @@ router.post(
         return res.status(400).json({ success: false, errors: errors.array() });
       }
 
-      const { email, password } = req.body;
+      const { username, password } = req.body;
 
-      // Authenticate with Supabase
+      // 1. Check states first (States do not use Supabase Auth)
+      let { data: stateProfile } = await supabase
+        .from('states')
+        .select('*')
+        .eq('username', username)
+        .maybeSingle();
+
+      if (stateProfile && stateProfile.password === password) {
+        const fakedProfile = {
+          id: stateProfile.id,
+          role: 'state_admin',
+          full_name: stateProfile.name + ' Admin',
+          state_id: stateProfile.id,
+          states: { name: stateProfile.name, code: stateProfile.code }
+        };
+        return res.json({
+          success: true,
+          message: 'Login successful',
+          data: { 
+            user: fakedProfile, 
+            profile: fakedProfile, 
+            session: { access_token: 'dummy', user: { id: stateProfile.id } } 
+          },
+        });
+      }
+
+      // 2. Check cities first (Cities do not use Supabase Auth either)
+      let { data: cityProfile } = await supabase
+        .from('cities')
+        .select('*, states(name, code)')
+        .eq('username', username)
+        .maybeSingle();
+
+      if (cityProfile && cityProfile.password === password) {
+        const fakedProfile = {
+          id: cityProfile.id,
+          role: 'mc_admin',
+          full_name: cityProfile.name + ' Admin',
+          city_id: cityProfile.id,
+          state_id: cityProfile.state_id,
+          cities: { name: cityProfile.name },
+          states: cityProfile.states
+        };
+        return res.json({
+          success: true,
+          message: 'Login successful',
+          data: { 
+            user: fakedProfile, 
+            profile: fakedProfile, 
+            session: { access_token: 'dummy', user: { id: cityProfile.id } } 
+          },
+        });
+      }
+
+      // 3. If not State or City, it must be an Officer. Officers USE Supabase Auth!
+      const syntheticEmail = `${username}@auth.nagarsetu.com`;
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: syntheticEmail,
         password,
       });
 
       if (error) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid email or password',
+          error: 'Invalid username or password',
         });
       }
 
@@ -371,11 +430,11 @@ router.post(
         .select('*, states(name, code), cities(name), departments(name)')
         .eq('id', data.user.id)
         .single();
-
-      if (profileError) {
+        
+      if (profileError || !profile) {
         return res.status(400).json({
           success: false,
-          error: 'Failed to load profile',
+          error: 'Officer profile not found',
         });
       }
 
@@ -392,6 +451,7 @@ router.post(
         message: 'Login successful',
         data: { user: data.user, profile, session: data.session },
       });
+      
     } catch (error) {
       console.error('Error in admin login:', error);
       res.status(500).json({
@@ -410,7 +470,7 @@ router.post(
 router.post(
   '/admin/create',
   [
-    body('email').isEmail().normalizeEmail(),
+    body('username').notEmpty().trim(),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('full_name').notEmpty().trim(),
     body('role').isIn(['dept_officer', 'mc_admin', 'state_admin']).withMessage('Invalid role'),
@@ -425,13 +485,17 @@ router.post(
         return res.status(400).json({ success: false, errors: errors.array() });
       }
 
-      const { email, password, full_name, role, department_id, city_id, state_id } = req.body;
+      const { username, password, full_name, role, department_id, city_id, state_id } = req.body;
+
+      // Because Supabase Auth REQUIRES an email to create a user, 
+      // we combine their username with a dummy domain to use as the login identifier behind the scenes.
+      const syntheticEmail = `${username}@auth.nagarsetu.com`;
 
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
+        email: syntheticEmail,
         password,
-        email_confirm: false,
+        email_confirm: true,
       });
 
       if (authError) {
@@ -441,14 +505,15 @@ router.post(
         });
       }
 
-      // Create profile
+      // Create profile directly in officers table using the UUID from auth.users
       const { data: profile, error: profileError } = await supabase
         .from('officers')
         .insert({
           id: authData.user.id,
           full_name,
+          username,
+          password,
           phone: null,
-          email: email,
           role,
           department_id: role === 'dept_officer' ? department_id : null,
           city_id: city_id || null,
@@ -489,7 +554,7 @@ router.get('/admin/users', async (req, res) => {
   try {
     const { data: profiles, error } = await supabase
       .from('officers')
-      .select('id, full_name, phone, email, role, city_id, department_id, created_at')
+      .select('id, full_name, phone, username, role, city_id, department_id, created_at')
       .in('role', ['dept_officer', 'mc_admin', 'state_admin']);
 
     if (error) {
@@ -521,12 +586,15 @@ router.delete('/admin/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
+    const { error: deleteError } = await supabase
+      .from('officers')
+      .delete()
+      .eq('id', userId);
 
-    if (deleteAuthError) {
+    if (deleteError) {
       return res.status(400).json({
         success: false,
-        error: deleteAuthError.message,
+        error: deleteError.message,
       });
     }
 
@@ -563,9 +631,12 @@ router.post(
 
       const { userId, newPassword } = req.body;
 
-      const { user, error } = await supabase.auth.admin.updateUserById(userId, {
-        password: newPassword,
-      });
+      const { data: user, error } = await supabase
+        .from('officers')
+        .update({ password: newPassword })
+        .eq('id', userId)
+        .select()
+        .single();
 
       if (error) {
         return res.status(400).json({

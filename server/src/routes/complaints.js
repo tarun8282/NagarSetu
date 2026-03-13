@@ -289,16 +289,88 @@ router.get('/:id', async (req, res) => {
             .eq('complaint_id', complaint.id)
             .order('created_at', { ascending: true });
 
+        const { data: media } = await supabase
+            .from('complaint_media')
+            .select('*')
+            .eq('complaint_id', complaint.id);
+
         res.json({
             success: true,
             complaint: {
                 ...complaint,
                 ai_classification: aiClassification || null,
-                status_history: statusHistory || []
+                status_history: statusHistory || [],
+                media: media || []
             }
         });
     } catch (error) {
         console.error('Error fetching complaint:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.patch('/:id/status', upload.array('proof', 1), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, remarks, changed_by } = req.body;
+        const proofFiles = req.files || [];
+
+        if (!status) return res.status(400).json({ success: false, error: 'Status is required' });
+
+        // 1. Get current status for history
+        const { data: current, error: fetchErr } = await supabase
+            .from('complaints')
+            .select('status')
+            .eq('id', id)
+            .single();
+        if (fetchErr) throw fetchErr;
+
+        // 2. Update complaint
+        const updateData = { status, updated_at: new Date().toISOString() };
+        if (status === 'resolved') updateData.resolved_at = new Date().toISOString();
+
+        const { error: updateErr } = await supabase
+            .from('complaints')
+            .update(updateData)
+            .eq('id', id);
+        if (updateErr) throw updateErr;
+
+        // 3. Log History
+        await supabase.from('status_history').insert({
+            complaint_id: id,
+            old_status: current.status,
+            new_status: status,
+            changed_by,
+            remarks
+        });
+
+        // 4. Handle Proof if any
+        if (proofFiles.length > 0) {
+            for (const file of proofFiles) {
+                const storagePath = `proofs/${id}/${Date.now()}-${file.originalname}`;
+                const { error: uploadErr } = await supabase.storage
+                    .from('complaint-media')
+                    .upload(storagePath, file.buffer, { contentType: file.mimetype });
+
+                if (!uploadErr) {
+                    const { data: urlData } = supabase.storage
+                        .from('complaint-media')
+                        .getPublicUrl(storagePath);
+
+                    await supabase.from('complaint_media').insert({
+                        complaint_id: id,
+                        storage_path: storagePath,
+                        public_url: urlData.publicUrl,
+                        is_resolution_proof: true,
+                        uploaded_by: changed_by
+                    });
+                }
+            }
+        }
+
+        res.json({ success: true, message: 'Status updated successfully' });
+    } catch (error) {
+        console.error('Error updating status:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
