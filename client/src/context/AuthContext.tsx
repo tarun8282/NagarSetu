@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .select('*, states(name, code), cities(name), departments(name)')
           .eq('id', sessionUser.id)
           .maybeSingle();
-          
+
         if (officerData) {
           profileData = officerData;
         }
@@ -119,31 +119,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     stateId?: string
   ) => {
     const response = await authAPI.verifyOTPAndSignUp(email, fullName, mobileNo, otp, cityId, stateId);
-    
+
     if (response.success && response.data?.user) {
       await fetchProfile(response.data.user);
     }
-    
+
     return response;
   };
 
   const loginCitizenWithOTP = async (email: string, otp: string) => {
     const response = await authAPI.citizenLoginWithOTP(email, otp);
-    
+
     if (response.success && response.data?.user) {
       await fetchProfile(response.data.user);
     }
-    
+
     return response;
   };
 
   const loginAdmin = async (email: string, password: string) => {
     const response = await authAPI.adminLogin(email, password);
-    
+
     if (response.success && response.data?.user) {
       await fetchProfile(response.data.user);
     }
-    
+
     return response;
   };
 
@@ -155,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider 
+    <AuthContext.Provider
       value={{
         user,
         loading,
