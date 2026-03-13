@@ -233,3 +233,16 @@ ALTER TABLE public.states
 ALTER TABLE public.cities
   ADD COLUMN username TEXT UNIQUE,
   ADD COLUMN password TEXT;
+
+
+CREATE TABLE alerts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    priority TEXT CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    location TEXT,
+    source TEXT,
+    "publishedAt" TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);

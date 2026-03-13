@@ -1,17 +1,14 @@
-"use client";
-
-import { Mic, Square } from "lucide-react";
+import { Mic, Square, AlertCircle, Info } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 interface AIVoiceInputProps {
   onStart?: () => void;
   onStop?: (duration: number) => void;
   onTranscript?: (text: string) => void;
   visualizerBars?: number;
-  demoMode?: boolean;
-  demoInterval?: number;
   className?: string;
+  language?: string;
 }
 
 export function AIVoiceInput({
@@ -19,24 +16,23 @@ export function AIVoiceInput({
   onStop,
   onTranscript,
   visualizerBars = 48,
-  demoMode = false,
-  demoInterval = 3000,
-  className
+  className,
+  language = "en-IN"
 }: AIVoiceInputProps) {
-  const [submitted, setSubmitted] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [time, setTime] = useState(0);
   const [isClient, setIsClient] = useState(false);
-  const [isDemo, setIsDemo] = useState(demoMode);
+  const [isSupported, setIsSupported] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [heights, setHeights] = useState<number[]>(Array(visualizerBars).fill(20));
 
   const recognitionRef = useRef<any>(null);
   const onTranscriptRef = useRef(onTranscript);
-  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const submittedRef = useRef(submitted);
+  const isRecordingRef = useRef(isRecording);
 
   useEffect(() => {
-    submittedRef.current = submitted;
-  }, [submitted]);
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
@@ -44,82 +40,89 @@ export function AIVoiceInput({
 
   useEffect(() => {
     setIsClient(true);
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = "en-IN"; // Set Indian English for better local recognition
-        
-        recognitionRef.current.onresult = (event: any) => {
-          let text = "";
-          for (let i = 0; i < event.results.length; ++i) {
-            text += event.results[i][0].transcript;
-          }
-          if (onTranscriptRef.current) {
-            onTranscriptRef.current(text);
-          }
-          
-          // Reset the 2-minute auto-off timeout whenever voice is recognized
-          if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-          silenceTimeoutRef.current = setTimeout(() => {
-            setSubmitted(false);
-          }, 120000); // 2 minutes
-        };
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      setIsSupported(false);
+      setError("Speech recognition not supported in this browser.");
+      return;
+    }
 
-        recognitionRef.current.onerror = (event: any) => {
-          console.error("Speech recognition error", event.error);
-          if (event.error === 'not-allowed' || event.error === 'audio-capture') {
-            setSubmitted(false);
-          }
-          // Do not toggle off on 'no-speech', 'aborted', or 'network'.
-          // Let onend handle restarting if submittedRef is still true.
-        };
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = language;
+      
+      recognition.onresult = (event: any) => {
+        let fullTranscript = "";
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        if (onTranscriptRef.current) {
+          onTranscriptRef.current(fullTranscript);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        if (event.error === 'not-allowed') {
+          setError("Microphone access denied. Please check site permissions.");
+        } else if (event.error === 'no-speech') {
+          // Keep recording, but maybe show a subtle hint
+        } else if (event.error === 'network') {
+          setError("Network error. Speech recognition requires internet.");
+        } else {
+          setError(`Error: ${event.error}`);
+        }
         
-        recognitionRef.current.onend = () => {
-          // If browser naturally stops recognition but user hasn't stopped it manually, force restart it
-          if (submittedRef.current && recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch (e) {
-              console.error("Failed to restart recognition", e);
-            }
+        if (event.error !== 'no-speech') {
+          setIsRecording(false);
+        }
+      };
+      
+      recognition.onend = () => {
+        // Only restart if we're supposed to be recording and it wasn't a manual stop
+        if (isRecordingRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("Failed to restart recognition", e);
+            setIsRecording(false);
           }
-        };
-      }
+        }
+      };
+
+      recognitionRef.current = recognition;
+    } catch (err) {
+      console.error("Failed to initialize speech recognition", err);
+      setIsSupported(false);
     }
     
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      if (silenceTimeoutRef.current) {
-        clearTimeout(silenceTimeoutRef.current);
-      }
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
     let visIntervalId: NodeJS.Timeout;
 
-    if (submitted) {
+    if (isRecording) {
+      setError(null);
       onStart?.();
       
-      // Start initial 2-minute silence timeout
-      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-      silenceTimeoutRef.current = setTimeout(() => {
-        setSubmitted(false);
-      }, 120000);
-
-      if (recognitionRef.current && !isDemo) {
+      if (recognitionRef.current) {
         try {
           recognitionRef.current.start();
         } catch(e) {
-          console.error(e);
+          console.error("Start error:", e);
         }
       }
+      
       intervalId = setInterval(() => {
         setTime((t) => t + 1);
       }, 1000);
@@ -131,14 +134,11 @@ export function AIVoiceInput({
       if (time > 0) {
         onStop?.(time);
       }
-      if (silenceTimeoutRef.current) {
-        clearTimeout(silenceTimeoutRef.current);
-      }
-      if (recognitionRef.current && !isDemo) {
+      if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch(e) {
-          console.error(e);
+          // Recognition might already be stopped
         }
       }
       setTime(0);
@@ -150,73 +150,71 @@ export function AIVoiceInput({
       clearInterval(visIntervalId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitted, isDemo, visualizerBars]);
+  }, [isRecording, visualizerBars]);
 
-  useEffect(() => {
-    if (!isDemo) return;
-
-    let timeoutId: NodeJS.Timeout;
-    const runAnimation = () => {
-      setSubmitted(true);
-      timeoutId = setTimeout(() => {
-        setSubmitted(false);
-        timeoutId = setTimeout(runAnimation, 1000);
-      }, demoInterval);
-    };
-
-    const initialTimeout = setTimeout(runAnimation, 100);
-    return () => {
-      clearTimeout(timeoutId);
-      clearTimeout(initialTimeout);
-    };
-  }, [isDemo, demoInterval]);
-
-
-
-  const handleClick = () => {
-    if (isDemo) {
-      setIsDemo(false);
-      setSubmitted(false);
-    } else {
-      setSubmitted((prev) => !prev);
-    }
+  const toggleRecording = () => {
+    if (!isSupported) return;
+    setIsRecording((prev) => !prev);
   };
 
-  return (
-    <div className={cn("w-full flex items-center justify-between gap-4", className)}>
-      <div className="flex-1 flex items-center justify-start overflow-hidden px-2 h-8 mask-fade-right">
-        {submitted && (
-          <div className="flex items-center justify-between gap-[3px] w-full h-full overflow-hidden pr-4">
-            {heights.map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 min-w-[2px] max-w-[4px] rounded-full bg-saffron-500 transition-all ease-in-out"
-                style={{
-                  height: `${h}%`,
-                  transitionDuration: '150ms'
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+  if (!isClient) return null;
 
-      <button
-        className={cn(
-          "w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 group pointer-events-auto",
-          submitted
-            ? "bg-red-100 text-red-500 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 shadow-sm"
-            : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 shadow-sm"
-        )}
-        type="button"
-        onClick={handleClick}
-      >
-        {submitted ? (
-          <Square className="w-4 h-4 fill-current animate-pulse" />
-        ) : (
-          <Mic className="w-5 h-5 group-hover:text-saffron-600 dark:group-hover:text-saffron-400 transition-colors" />
-        )}
-      </button>
+  return (
+    <div className={cn("w-full flex flex-col gap-2", className)}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 flex items-center justify-start overflow-hidden px-2 h-8">
+          {isRecording && (
+            <div className="flex items-center justify-between gap-[3px] w-full h-full overflow-hidden pr-4">
+              {heights.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex-1 min-w-[2px] max-w-[4px] rounded-full bg-saffron-500 transition-all ease-in-out"
+                  style={{
+                    height: `${h}%`,
+                    transitionDuration: '150ms'
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {!isRecording && error && (
+            <div className="flex items-center gap-2 text-xs text-red-500 animate-in fade-in slide-in-from-left-2 transition-all">
+              <AlertCircle size={14} />
+              <span>{error}</span>
+            </div>
+          )}
+          {!isRecording && !error && !isSupported && (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Info size={14} />
+              <span>Use Chrome/Edge for voice input.</span>
+            </div>
+          )}
+        </div>
+
+        <button
+          className={cn(
+            "w-10 h-10 rounded-full flex items-center justify-center transition-all flex-shrink-0 group pointer-events-auto",
+            isRecording
+              ? "bg-red-100 text-red-500 hover:bg-red-200 dark:bg-red-900/30 shadow-inner"
+              : isSupported 
+                ? "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700" 
+                : "bg-slate-50 text-slate-300 cursor-not-allowed"
+          )}
+          type="button"
+          onClick={toggleRecording}
+          title={!isSupported ? "Not supported in this browser" : isRecording ? "Stop recording" : "Start voice-to-text"}
+          disabled={!isSupported}
+        >
+          {isRecording ? (
+            <Square className="w-4 h-4 fill-current animate-pulse" />
+          ) : (
+            <Mic className={cn(
+              "w-5 h-5 transition-colors",
+              isSupported && "group-hover:text-saffron-600 dark:group-hover:text-saffron-400"
+            )} />
+          )}
+        </button>
+      </div>
     </div>
   );
 }

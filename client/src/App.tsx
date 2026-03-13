@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
+import Footer from './components/layout/Footer';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -45,11 +46,12 @@ const App: React.FC = () => {
           <Route path="/complaint/:id" element={user ? <ComplaintDetail /> : <Navigate to="/login" />} />
 
           <Route path="/officer/dashboard" element={user?.role === 'dept_officer' ? <OfficerDashboard /> : <Navigate to="/login" />} />
-          <Route path="/admin/dashboard" element={['mc_admin', 'state_admin'].includes(user?.role) ? <AdminDashboard /> : <Navigate to="/login" />} />
+          <Route path="/admin/dashboard" element={user?.role && ['mc_admin', 'state_admin'].includes(user.role) ? <AdminDashboard /> : <Navigate to="/login" />} />
 
           <Route path="/heatmap" element={<HeatmapView />} />
         </Routes>
       </main>
+      <Footer />
     </div>
   );
 };
