@@ -60,14 +60,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (sessionUser: User) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, states(name, code), cities(name), departments(name)')
-        .eq('id', sessionUser.id)
-        .single();
+      let profileData = null;
 
-      if (data) {
-        setUser({ ...sessionUser, ...data } as AppUser);
+      // First check if user is a citizen
+      const { data: citizenData } = await supabase
+        .from('citizens')
+        .select('*, states(name, code), cities(name)')
+        .eq('id', sessionUser.id)
+        .maybeSingle();
+
+      if (citizenData) {
+        profileData = { ...citizenData, role: 'citizen' };
+      } else {
+        // If not citizen, check if they are an officer/admin
+        const { data: officerData } = await supabase
+          .from('officers')
+          .select('*, states(name, code), cities(name), departments(name)')
+          .eq('id', sessionUser.id)
+          .maybeSingle();
+          
+        if (officerData) {
+          profileData = officerData;
+        }
+      }
+
+      if (profileData) {
+        setUser({ ...sessionUser, ...profileData } as AppUser);
       } else {
         setUser(sessionUser as AppUser);
       }

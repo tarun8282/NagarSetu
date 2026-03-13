@@ -1,4 +1,14 @@
--- NagarSetu Database Schema
+
+-- WARNING: This will drop existing tables and data!
+DROP TABLE IF EXISTS public.status_history CASCADE;
+DROP TABLE IF EXISTS public.ai_classifications CASCADE;
+DROP TABLE IF EXISTS public.complaint_media CASCADE;
+DROP TABLE IF EXISTS public.complaints CASCADE;
+DROP TABLE IF EXISTS public.officers CASCADE;
+DROP TABLE IF EXISTS public.citizens CASCADE;
+DROP TABLE IF EXISTS public.departments CASCADE;
+DROP TABLE IF EXISTS public.cities CASCADE;
+DROP TABLE IF EXISTS public.states CASCADE;
 
 -- 1. States Table
 CREATE TABLE public.states (
@@ -29,32 +39,44 @@ CREATE TABLE public.departments (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 4. Profiles Table (Extends Auth.Users)
---    - email: UNIQUE, used for Email-OTP authentication
---    - phone: no UNIQUE constraint (duplicate phone numbers allowed)
-CREATE TABLE public.profiles (
+-- 4. Citizens Table (Extends Auth.Users)
+CREATE TABLE public.citizens (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name TEXT,
     email TEXT UNIQUE,
     phone TEXT,
-    role TEXT CHECK (role IN ('citizen', 'dept_officer', 'mc_admin', 'state_admin')),
     state_id UUID REFERENCES public.states(id),
     city_id UUID REFERENCES public.cities(id),
-    department_id UUID REFERENCES public.departments(id),
     ward_number TEXT,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Indexes for Profiles
-CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
-CREATE INDEX IF NOT EXISTS idx_profiles_phone ON public.profiles(phone);
+-- Indexes for Citizens
+CREATE INDEX IF NOT EXISTS idx_citizens_email ON public.citizens(email);
+CREATE INDEX IF NOT EXISTS idx_citizens_phone ON public.citizens(phone);
+
+-- 4b. Officers & Admins Table (Extends Auth.Users)
+CREATE TABLE public.officers (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name TEXT,
+    email TEXT UNIQUE,
+    phone TEXT,
+    role TEXT CHECK (role IN ('dept_officer', 'mc_admin', 'state_admin')),
+    state_id UUID REFERENCES public.states(id),
+    city_id UUID REFERENCES public.cities(id),
+    department_id UUID REFERENCES public.departments(id),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_officers_email ON public.officers(email);
 
 -- 5. Complaints Table
 CREATE TABLE public.complaints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     complaint_number TEXT UNIQUE NOT NULL,
-    citizen_id UUID REFERENCES public.profiles(id),
+    citizen_id UUID REFERENCES public.citizens(id),
     title TEXT NOT NULL,
     description TEXT,
     latitude DOUBLE PRECISION,
@@ -67,7 +89,7 @@ CREATE TABLE public.complaints (
     priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
     category TEXT,
     assigned_department_id UUID REFERENCES public.departments(id),
-    assigned_officer_id UUID REFERENCES public.profiles(id),
+    assigned_officer_id UUID REFERENCES public.officers(id),
     citizen_rating INTEGER CHECK (citizen_rating >= 1 AND citizen_rating <= 5),
     sla_deadline TIMESTAMPTZ,
     resolved_at TIMESTAMPTZ,
@@ -83,7 +105,7 @@ CREATE TABLE public.complaint_media (
     public_url TEXT NOT NULL,
     is_video BOOLEAN DEFAULT false,
     is_resolution_proof BOOLEAN DEFAULT false,
-    uploaded_by UUID REFERENCES public.profiles(id),
+    uploaded_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -107,7 +129,7 @@ CREATE TABLE public.status_history (
     complaint_id UUID REFERENCES public.complaints(id) ON DELETE CASCADE,
     old_status TEXT,
     new_status TEXT,
-    changed_by UUID REFERENCES public.profiles(id),
+    changed_by UUID REFERENCES auth.users(id),
     remarks TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -116,7 +138,8 @@ CREATE TABLE public.status_history (
 ALTER TABLE public.states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.citizens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.officers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.complaints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.complaint_media ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_classifications ENABLE ROW LEVEL SECURITY;
@@ -124,9 +147,12 @@ ALTER TABLE public.status_history ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
--- Profiles: Users can read all profiles (to see officer names etc), but only update their own
-CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+-- Citizens & Officers RLS
+CREATE POLICY "Public citizens viewable by everyone" ON public.citizens FOR SELECT USING (true);
+CREATE POLICY "Users can update own citizen profile" ON public.citizens FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Public officers viewable by everyone" ON public.officers FOR SELECT USING (true);
+CREATE POLICY "Users can update own officer profile" ON public.officers FOR UPDATE USING (auth.uid() = id);
 
 -- Complaints:
 -- Citizens: See only their own
@@ -137,7 +163,7 @@ USING (auth.uid() = citizen_id);
 CREATE POLICY "Officers can view complaints in their dept" ON public.complaints FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles
+    SELECT 1 FROM public.officers
     WHERE id = auth.uid()
     AND role = 'dept_officer'
     AND city_id = public.complaints.city_id
@@ -149,7 +175,7 @@ USING (
 CREATE POLICY "MC Admins can view all complaints in city" ON public.complaints FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles
+    SELECT 1 FROM public.officers
     WHERE id = auth.uid()
     AND role = 'mc_admin'
     AND city_id = public.complaints.city_id
@@ -160,7 +186,7 @@ USING (
 CREATE POLICY "State Admins can view all complaints in state" ON public.complaints FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles
+    SELECT 1 FROM public.officers
     WHERE id = auth.uid()
     AND role = 'state_admin'
     AND state_id = public.complaints.state_id
@@ -175,7 +201,7 @@ WITH CHECK (auth.uid() = citizen_id);
 CREATE POLICY "Officers and Admins can update complaints" ON public.complaints FOR UPDATE
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles
+    SELECT 1 FROM public.officers
     WHERE id = auth.uid()
     AND role IN ('dept_officer', 'mc_admin')
   )
@@ -184,3 +210,13 @@ USING (
 -- Enable Realtime
 -- Note: In Supabase, this is often done via the dashboard, but can be done via SQL
 -- ALTER PUBLICATION supabase_realtime ADD TABLE public.complaints;
+
+CREATE TABLE public.otp_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email TEXT NOT NULL,
+    otp TEXT NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    expires_at TIMESTAMPTZ NOT NULL,    -- 10 minutes
+    verified_at TIMESTAMPTZ,             -- null until verified
+    created_at TIMESTAMPTZ DEFAULT now()
+);

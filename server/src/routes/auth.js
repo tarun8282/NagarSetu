@@ -71,7 +71,7 @@ router.post(
 
       // Check if user already exists
       const { data: existingUser } = await supabase
-        .from('profiles')
+        .from('citizens')
         .select('id')
         .eq('email', email)
         .single();
@@ -182,13 +182,12 @@ router.post(
 
       // Create profile
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
+        .from('citizens')
         .insert({
           id: authData.user.id,
           full_name,
           phone: mobile_no,
           email: email,
-          role: 'citizen',
           city_id: city_id || null,
           state_id: state_id || null,
         })
@@ -288,8 +287,8 @@ router.post(
 
       // Get user profile
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*, states(name, code), cities(name), departments(name)')
+        .from('citizens')
+        .select('*, states(name, code), cities(name)')
         .eq('id', user.id)
         .single();
 
@@ -353,7 +352,7 @@ router.post(
 
       // Get user profile
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
+        .from('officers')
         .select('*, states(name, code), cities(name), departments(name)')
         .eq('id', data.user.id)
         .single();
@@ -429,7 +428,7 @@ router.post(
 
       // Create profile
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
+        .from('officers')
         .insert({
           id: authData.user.id,
           full_name,
@@ -474,7 +473,7 @@ router.post(
 router.get('/admin/users', async (req, res) => {
   try {
     const { data: profiles, error } = await supabase
-      .from('profiles')
+      .from('officers')
       .select('id, full_name, phone, email, role, city_id, department_id, created_at')
       .in('role', ['dept_officer', 'mc_admin', 'state_admin']);
 
@@ -591,11 +590,27 @@ router.get('/profile', async (req, res) => {
       });
     }
 
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('*, states(name, code), cities(name), departments(name)')
+    // First check citizen table
+    let { data: profile, error } = await supabase
+      .from('citizens')
+      .select('*, states(name, code), cities(name)')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
+
+    if (!profile) {
+      // If not a citizen, check officer table
+      const { data: officerProfile, error: officerError } = await supabase
+        .from('officers')
+        .select('*, states(name, code), cities(name), departments(name)')
+        .eq('id', userId)
+        .maybeSingle();
+        
+      if (officerProfile) {
+        profile = officerProfile;
+      } else {
+        error = officerError || error;
+      }
+    }
 
     if (error) {
       return res.status(400).json({
