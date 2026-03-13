@@ -1,7 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Home, PlusCircle, LayoutDashboard, Map, LogOut, Menu } from 'lucide-react';
+import { Home, PlusCircle, LayoutDashboard, Map, LogOut, Menu, PhoneCall } from 'lucide-react';
+
+// Reusable SOS button — navigates to the dedicated Emergency page
+const SOSButton: React.FC = () => (
+  <Link
+    to="/emergency"
+    aria-label="Emergency SOS — Open Emergency Services"
+    className="relative inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold text-sm rounded-full shadow-lg shadow-red-400/40 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-red-300"
+  >
+    {/* Pulsing ring */}
+    <span className="absolute inset-0 rounded-full bg-red-500 opacity-30 animate-ping" />
+    <PhoneCall size={15} strokeWidth={2.5} className="relative z-10" />
+    <span className="relative z-10 tracking-widest">SOS</span>
+  </Link>
+);
 
 const Navbar: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -44,6 +58,8 @@ const Navbar: React.FC = () => {
               <Link to="/register" className="px-5 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 font-medium transition-colors shadow-lg shadow-indigo-200 dark:shadow-none">Register</Link>
             </div>
           )}
+          {/* SOS — always visible on desktop */}
+          <SOSButton />
         </div>
 
         {/* Mobile menu button */}
@@ -55,7 +71,17 @@ const Navbar: React.FC = () => {
       {/* Mobile Menu (Simplified) */}
       {isMenuOpen && (
         <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 flex flex-col gap-4 animate-in slide-in-from-top duration-300">
-           {/* Add mobile links here if needed */}
+          <Link to="/" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><Home size={18} /> Home</Link>
+          <Link to="/heatmap" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><Map size={18} /> Heatmap</Link>
+          {user && (
+            <>
+              <Link to="/dashboard" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><LayoutDashboard size={18} /> Dashboard</Link>
+              <Link to="/complaint/new" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><PlusCircle size={18} /> Report Issue</Link>
+              <button onClick={() => { signOut(); setIsMenuOpen(false); }} className="flex items-center gap-2 text-red-500"><LogOut size={18} /> Logout</button>
+            </>
+          )}
+          {/* SOS always visible in mobile menu */}
+          <SOSButton />
         </div>
       )}
     </nav>
