@@ -150,9 +150,11 @@ ALTER TABLE public.status_history ENABLE ROW LEVEL SECURITY;
 -- Citizens & Officers RLS
 CREATE POLICY "Public citizens viewable by everyone" ON public.citizens FOR SELECT USING (true);
 CREATE POLICY "Users can update own citizen profile" ON public.citizens FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Enable insert for authenticated users only" ON public.citizens FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Public officers viewable by everyone" ON public.officers FOR SELECT USING (true);
 CREATE POLICY "Users can update own officer profile" ON public.officers FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Enable insert for all" ON public.officers FOR INSERT WITH CHECK (true);
 
 -- Complaints:
 -- Citizens: See only their own
@@ -220,3 +222,14 @@ CREATE TABLE public.otp_tokens (
     verified_at TIMESTAMPTZ,             -- null until verified
     created_at TIMESTAMPTZ DEFAULT now()
 );
+
+
+-- ALTER: Add username & password to states
+ALTER TABLE public.states
+  ADD COLUMN username TEXT UNIQUE,
+  ADD COLUMN password TEXT;
+
+-- ALTER: Add username & password to cities
+ALTER TABLE public.cities
+  ADD COLUMN username TEXT UNIQUE,
+  ADD COLUMN password TEXT;

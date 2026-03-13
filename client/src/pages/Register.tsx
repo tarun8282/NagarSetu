@@ -18,6 +18,7 @@ const Register: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNo, setMobileNo] = useState('');
+  const [password, setPassword] = useState('');
 
   // Step 2: OTP verification
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -65,6 +66,11 @@ const Register: React.FC = () => {
       return;
     }
 
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await sendRegistrationOTP(email, fullName, mobileNo);
@@ -95,7 +101,7 @@ const Register: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await verifyOTPAndSignUp(email, fullName, mobileNo, otpToken);
+      const response = await verifyOTPAndSignUp(email, fullName, mobileNo, otpToken, password);
 
       if (response.success) {
         setSuccessMessage('Account created successfully! Redirecting...');
@@ -211,10 +217,25 @@ const Register: React.FC = () => {
               </div>
             </div>
 
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Create Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={loading}
+              />
+            </div>
+
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading || !fullName || !email || !mobileNo}
+              disabled={loading || !fullName || !email || !mobileNo || password.length < 8}
               className="w-full py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-medium transition-colors flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}

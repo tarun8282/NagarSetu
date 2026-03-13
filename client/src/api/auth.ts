@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import { AuthError } from '@supabase/supabase-js';
 
 export interface SignUpData {
   email: string;
@@ -132,6 +131,7 @@ export const verifyOTPAndSignUp = async (
   fullName: string,
   mobileNo: string,
   otp: string,
+  password?: string,
   cityId?: string,
   stateId?: string
 ): Promise<SignUpResponse> => {
@@ -146,6 +146,7 @@ export const verifyOTPAndSignUp = async (
         full_name: fullName,
         mobile_no: mobileNo,
         otp,
+        password,
         city_id: cityId,
         state_id: stateId,
       }),
@@ -176,21 +177,21 @@ export const verifyOTPAndSignUp = async (
 };
 
 /**
- * Citizen login with OTP
+ * Citizen login with password
  */
-export const citizenLoginWithOTP = async (
+export const citizenLogin = async (
   email: string,
-  otp: string
+  password: string
 ): Promise<SignUpResponse> => {
   try {
-    const response = await fetch('/api/auth/login-with-otp', {
+    const response = await fetch('/api/auth/citizen/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         email,
-        otp,
+        password,
       }),
     });
 
@@ -200,7 +201,7 @@ export const citizenLoginWithOTP = async (
       return {
         success: false,
         message: data.message || 'Login failed',
-        error: data.error || 'Invalid OTP'
+        error: data.error || 'Invalid credentials'
       };
     }
 

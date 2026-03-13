@@ -23,8 +23,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   sendRegistrationOTP: (email: string, fullName: string, mobileNo: string) => Promise<authAPI.SignUpResponse>;
   sendLoginOTP: (email: string) => Promise<authAPI.SignUpResponse>;
-  verifyOTPAndSignUp: (email: string, fullName: string, mobileNo: string, otp: string, cityId?: string, stateId?: string) => Promise<authAPI.SignUpResponse>;
-  citizenLoginWithOTP: (email: string, otp: string) => Promise<authAPI.SignUpResponse>;
+  verifyOTPAndSignUp: (email: string, fullName: string, mobileNo: string, otp: string, password?: string, cityId?: string, stateId?: string) => Promise<authAPI.SignUpResponse>;
+  citizenLogin: (email: string, password: string) => Promise<authAPI.SignUpResponse>;
   adminLogin: (email: string, password: string) => Promise<authAPI.SignUpResponse>;
   refreshUser: () => Promise<void>;
 }
@@ -115,10 +115,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fullName: string,
     mobileNo: string,
     otp: string,
+    password?: string,
     cityId?: string,
     stateId?: string
   ) => {
-    const response = await authAPI.verifyOTPAndSignUp(email, fullName, mobileNo, otp, cityId, stateId);
+    const response = await authAPI.verifyOTPAndSignUp(email, fullName, mobileNo, otp, password, cityId, stateId);
 
     if (response.success && response.data?.user) {
       await fetchProfile(response.data.user);
@@ -127,8 +128,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return response;
   };
 
-  const loginCitizenWithOTP = async (email: string, otp: string) => {
-    const response = await authAPI.citizenLoginWithOTP(email, otp);
+  const loginCitizen = async (email: string, password: string) => {
+    const response = await authAPI.citizenLogin(email, password);
 
     if (response.success && response.data?.user) {
       await fetchProfile(response.data.user);
@@ -163,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendRegistrationOTP: sendRegistrationOTPHandler,
         sendLoginOTP: sendLoginOTPHandler,
         verifyOTPAndSignUp: verifyOTPAndRegister,
-        citizenLoginWithOTP: loginCitizenWithOTP,
+        citizenLogin: loginCitizen,
         adminLogin: loginAdmin,
         refreshUser: refreshUserData,
       }}

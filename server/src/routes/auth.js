@@ -135,6 +135,7 @@ router.post(
   [
     body('email').isEmail().normalizeEmail(),
     body('otp').isLength({ min: 6, max: 6 }).isNumeric(),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
     body('full_name').notEmpty().trim(),
     body('mobile_no').notEmpty().trim(),  // Accept any mobile format
     body('city_id').optional().isUUID(),
@@ -148,7 +149,7 @@ router.post(
         return res.status(400).json({ success: false, errors: errors.array() });
       }
 
-      const { email, otp, full_name, mobile_no, city_id, state_id } = req.body;
+      const { email, otp, password, full_name, mobile_no, city_id, state_id } = req.body;
       console.log('verify-otp request:', { email, otp: '****', full_name, mobile_no, city_id, state_id });
 
       // Verify OTP
@@ -194,7 +195,7 @@ router.post(
         // Create new Supabase auth user
         const { data: newAuthData, error: authError } = await supabase.auth.admin.createUser({
           email,
-          password: require('crypto').randomBytes(16).toString('hex'), // Random password not needed for OTP
+          password,
           email_confirm: true, // Mark email as confirmed since OTP was verified
         });
 
@@ -270,15 +271,15 @@ router.post(
 );
 
 /**
- * @route POST /api/auth/login-with-otp
- * @desc Login with OTP (for citizens)
+ * @route POST /api/auth/citizen/login
+ * @desc Login for citizens (password-based)
  * @access Public
  */
 router.post(
-  '/login-with-otp',
+  '/citizen/login',
   [
     body('email').isEmail().normalizeEmail(),
-    body('otp').isLength({ min: 6, max: 6 }).isNumeric(),
+    body('password').notEmpty(),
   ],
   async (req, res) => {
     try {
@@ -287,31 +288,18 @@ router.post(
         return res.status(400).json({ success: false, errors: errors.array() });
       }
 
-      const { email, otp } = req.body;
+      const { email, password } = req.body;
 
-      // Verify OTP
-      const otpResult = verifyOTP(email, otp);
-      if (!otpResult.valid) {
+      // Authenticate with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
         return res.status(400).json({
           success: false,
-          error: otpResult.error,
-        });
-      }
-
-      // Get user by email
-      const { data: userList, error: userError } = await supabase.auth.admin.listUsers();
-      if (userError) {
-        return res.status(400).json({
-          success: false,
-          error: 'Failed to authenticate',
-        });
-      }
-
-      const user = userList.users.find(u => u.email === email);
-      if (!user) {
-        return res.status(400).json({
-          success: false,
-          error: 'User not found',
+          error: 'Invalid email or password',
         });
       }
 
@@ -319,7 +307,7 @@ router.post(
       const { data: profile, error: profileError } = await supabase
         .from('citizens')
         .select('*, states(name, code), cities(name)')
-        .eq('id', user.id)
+        .eq('id', data.user.id)
         .single();
 
       if (profileError) {
@@ -329,16 +317,13 @@ router.post(
         });
       }
 
-      // Clear OTP from store
-      otpStore.delete(email);
-
       res.json({
         success: true,
         message: 'Login successful',
-        data: { user, profile },
+        data: { user: data.user, profile, session: data.session },
       });
     } catch (error) {
-      console.error('Error in login-with-otp:', error);
+      console.error('Error in citizen login:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Internal server error',
