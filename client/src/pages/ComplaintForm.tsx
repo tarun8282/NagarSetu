@@ -9,6 +9,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../context/AuthContext';
 import MapPicker from '../components/MapPicker';
+import { AIVoiceInput } from '../components/ui/ai-voice-input';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,6 +69,7 @@ const ComplaintForm: React.FC = () => {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const descriptionBeforeRecording = useRef('');
   const [address, setAddress] = useState('');
   const [pinPosition, setPinPosition] = useState<LatLng | null>(null);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
@@ -295,14 +297,32 @@ const ComplaintForm: React.FC = () => {
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Detailed Description <span className="text-red-500">*</span>
                 </label>
-                <textarea
-                  rows={5}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Explain the problem clearly — specific location details, how long it's been there, and how it's affecting the community..."
-                  className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-saffron-500 outline-none transition-all resize-none"
-                />
-                <p className="text-xs text-slate-400">
+                <div className="relative group">
+                  <textarea
+                    rows={6}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Explain the problem clearly — specific location details, how long it's been there, and how it's affecting the community..."
+                    className="w-full px-4 py-3 pb-20 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-saffron-500 outline-none transition-all resize-none"
+                  />
+                  <div className="absolute bottom-3 left-3 right-3 pointer-events-none z-10 flex items-end">
+                    <div className="pointer-events-auto w-full">
+                      <AIVoiceInput 
+                        onStart={() => {
+                          descriptionBeforeRecording.current = description;
+                        }}
+                        onTranscript={(text) => {
+                          const space = descriptionBeforeRecording.current && text ? ' ' : '';
+                          setDescription(descriptionBeforeRecording.current + space + text);
+                        }}
+                        onStop={(duration) => console.log('Recording stopped:', duration)}
+                        visualizerBars={100}
+                        className="p-0 m-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
                   Our AI will review your complaint before registering it. Make sure it describes a real civic issue.
                 </p>
               </div>
