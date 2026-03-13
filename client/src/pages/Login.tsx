@@ -207,7 +207,7 @@ const Login: React.FC = () => {
               className="w-full py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-medium transition-colors flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? <span>Logging in...</span> : <span>Login</span>}
             </button>
 
             {/* Signup Link */}
@@ -293,7 +293,7 @@ const Login: React.FC = () => {
               className="w-full py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-medium transition-colors flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? <span>Logging in...</span> : <span>Login</span>}
             </button>
           </form>
         )}

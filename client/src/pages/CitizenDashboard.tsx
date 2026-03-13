@@ -74,11 +74,15 @@ const CitizenDashboard: React.FC = () => {
                     </svg>
                 </div>
                 <div className="space-y-1 relative z-10">
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-deva">Namaste, {user?.full_name || 'Citizen'}</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Track and manage your civic complaints.</p>
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-deva">
+                        <span>{`Namaste, ${user?.full_name || 'Citizen'}`}</span>
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400">
+                        <span>Track and manage your civic complaints.</span>
+                    </p>
                 </div>
                 <Link to="/complaint/new" className="relative z-10 px-6 py-3 bg-saffron text-white rounded-lg font-bold hover:bg-saffron-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-saffron-200 dark:shadow-none">
-                    <Plus size={20} /> New Complaint
+                    <Plus size={20} /> <span>New Complaint</span>
                 </Link>
             </div>
 
@@ -93,8 +97,8 @@ const CitizenDashboard: React.FC = () => {
                     <div key={i} className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-4">
                         {stat.icon}
                         <div>
-                            <div className="text-2xl font-bold dark:text-white">{stat.count}</div>
-                            <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">{stat.label}</div>
+                            <div className="text-2xl font-bold dark:text-white" translate="no"><span>{stat.count}</span></div>
+                            <div className="text-xs text-slate-500 font-medium uppercase tracking-wider"><span>{stat.label}</span></div>
                         </div>
                     </div>
                 ))}
@@ -116,12 +120,12 @@ const CitizenDashboard: React.FC = () => {
                     </div>
                 ) : error ? (
                     <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300">
-                        {error}
+                        <span>{error}</span>
                     </div>
                 ) : complaints.length === 0 ? (
                     <div className="p-8 text-center bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                         <AlertCircle className="mx-auto mb-3 text-slate-400" size={32} />
-                        <p className="text-slate-600 dark:text-slate-400">No complaints yet. Create your first complaint!</p>
+                        <p className="text-slate-600 dark:text-slate-400"><span>No complaints yet. Create your first complaint!</span></p>
                     </div>
                 ) : (
                     <div className="grid gap-4">
@@ -129,16 +133,16 @@ const CitizenDashboard: React.FC = () => {
                             <Link key={c.id} to={`/complaint/${c.id}`} className="group p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-navy-blue-400 dark:hover:border-navy-blue-500 transition-all shadow-sm block">
                                 <div className="flex items-center justify-between gap-4">
                                     <div className="space-y-1">
-                                        <div className="text-xs font-mono font-bold text-saffron-600 uppercase tracking-tighter">{c.complaint_number}</div>
-                                        <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-navy-blue-600 transition-colors uppercase">{c.title}</h3>
+                                        <div className="text-xs font-mono font-bold text-saffron-600 uppercase tracking-tighter" translate="no"><span>{c.complaint_number}</span></div>
+                                        <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-navy-blue-600 transition-colors uppercase"><span>{c.title}</span></h3>
                                         <div className="text-sm text-slate-500 flex items-center gap-4">
-                                            <span>Filed on {new Date(c.created_at).toLocaleDateString()}</span>
+                                            <span>{`Filed on ${new Date(c.created_at).toLocaleDateString()}`}</span>
                                             <span>•</span>
                                             <span>Ward 45</span>
                                         </div>
                                     </div>
                                     <div className={cn("px-4 py-1.5 rounded-full text-xs font-bold border capitalize", getStatusStyle(c.status))}>
-                                        {c.status.replace(/_/g, ' ')}
+                                        <span>{c.status.replace(/_/g, ' ')}</span>
                                     </div>
                                 </div>
                             </Link>
