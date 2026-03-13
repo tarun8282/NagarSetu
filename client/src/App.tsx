@@ -11,6 +11,7 @@ import ComplaintDetail from './pages/ComplaintDetail';
 import ComplaintForm from './pages/ComplaintForm';
 import HeatmapView from './pages/HeatmapView';
 import Emergency from './pages/Emergency';
+import Alerts from './pages/Alerts';
 import { useAuth } from './context/AuthContext';
 
 const App: React.FC = () => {
@@ -41,11 +42,12 @@ const App: React.FC = () => {
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={user ? <CitizenDashboard /> : <Navigate to="/login" />} />
+          <Route path="/alerts" element={user ? <Alerts /> : <Navigate to="/login" />} />
           <Route path="/complaint/new" element={user ? <ComplaintForm /> : <Navigate to="/login" />} />
           <Route path="/complaint/:id" element={user ? <ComplaintDetail /> : <Navigate to="/login" />} />
 
           <Route path="/officer/dashboard" element={user?.role === 'dept_officer' ? <OfficerDashboard /> : <Navigate to="/login" />} />
-          <Route path="/admin/dashboard" element={['mc_admin', 'state_admin'].includes(user?.role) ? <AdminDashboard /> : <Navigate to="/login" />} />
+          <Route path="/admin/dashboard" element={user?.role && ['mc_admin', 'state_admin'].includes(user.role) ? <AdminDashboard /> : <Navigate to="/login" />} />
 
           <Route path="/heatmap" element={<HeatmapView />} />
         </Routes>

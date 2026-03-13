@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Home, PlusCircle, LayoutDashboard, Map, LogOut, Menu, Sun, Moon, PhoneCall } from 'lucide-react';
+import { Home, PlusCircle, LayoutDashboard, Map, LogOut, Menu, Sun, Moon, PhoneCall, Bell } from 'lucide-react';
 
 // Reusable SOS button — navigates to the dedicated Emergency page
 const SOSButton: React.FC = () => (
@@ -52,6 +52,9 @@ const Navbar: React.FC = () => {
               <Link to="/dashboard" className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-saffron transition-colors">
                 <LayoutDashboard size={18} /> Dashboard
               </Link>
+              <Link to="/alerts" className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-red-500 transition-colors">
+                <Bell size={18} /> Alerts
+              </Link>
               <Link to="/complaint/new" className="px-5 py-2.5 bg-saffron text-white rounded-lg font-medium flex items-center gap-2 hover:bg-saffron-600 transition-colors shadow-lg shadow-saffron-200 dark:shadow-none">
                 <PlusCircle size={18} /> Report Issue
               </Link>
@@ -94,6 +97,7 @@ const Navbar: React.FC = () => {
           {user && (
             <>
               <Link to="/dashboard" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><LayoutDashboard size={18} /> Dashboard</Link>
+              <Link to="/alerts" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><Bell size={18} /> Alerts</Link>
               <Link to="/complaint/new" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}><PlusCircle size={18} /> Report Issue</Link>
               <button onClick={() => { signOut(); setIsMenuOpen(false); }} className="flex items-center gap-2 text-red-500"><LogOut size={18} /> Logout</button>
             </>
