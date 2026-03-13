@@ -9,12 +9,12 @@ const SOSButton: React.FC = () => (
   <Link
     to="/emergency"
     aria-label="Emergency SOS — Open Emergency Services"
-    className="relative inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold text-sm rounded-full shadow-lg shadow-red-400/40 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-red-300"
+    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-extrabold text-sm rounded-full shadow-lg shadow-red-400/40 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-red-300"
   >
-    {/* Pulsing ring */}
-    <span className="absolute inset-0 rounded-full bg-red-500 opacity-30 animate-ping" />
-    <PhoneCall size={15} strokeWidth={2.5} className="relative z-10" />
-    <span className="relative z-10 tracking-widest">SOS</span>
+    {/* Small pulsing dot — contained, won't affect surrounding layout */}
+    <span className="w-2 h-2 rounded-full bg-white animate-pulse flex-shrink-0" />
+    <PhoneCall size={15} strokeWidth={2.5} />
+    <span className="tracking-widest">SOS</span>
   </Link>
 );
 

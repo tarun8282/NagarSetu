@@ -241,4 +241,95 @@ async function uploadMediaFiles(complaintId, uploadedBy, files) {
     }
 }
 
+/**
+ * @route GET /api/complaints
+ * @desc Get all complaints for a citizen
+ */
+router.get('/', async (req, res) => {
+    try {
+        const { citizen_id } = req.query;
+
+        if (!citizen_id) {
+            return res.status(400).json({ success: false, error: 'citizen_id is required' });
+        }
+
+        const { data: complaints, error } = await supabase
+            .from('complaints')
+            .select('*')
+            .eq('citizen_id', citizen_id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Fetch AI classification for each complaint
+        const complaintsWithAI = await Promise.all(
+            (complaints || []).map(async (complaint) => {
+                const { data: aiClassification } = await supabase
+                    .from('ai_classifications')
+                    .select('*')
+                    .eq('complaint_id', complaint.id)
+                    .single();
+
+                return {
+                    ...complaint,
+                    ai_classification: aiClassification || null
+                };
+            })
+        );
+
+        res.json({ success: true, complaints: complaintsWithAI });
+    } catch (error) {
+        console.error('Error fetching complaints:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @route GET /api/complaints/:id
+ * @desc Get a specific complaint by ID with AI classification and status history
+ */
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data: complaint, error } = await supabase
+            .from('complaints')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        if (!complaint) {
+            return res.status(404).json({ success: false, error: 'Complaint not found' });
+        }
+
+        // Fetch AI classification if exists
+        const { data: aiClassification } = await supabase
+            .from('ai_classifications')
+            .select('*')
+            .eq('complaint_id', complaint.id)
+            .single();
+
+        // Fetch status history
+        const { data: statusHistory } = await supabase
+            .from('status_history')
+            .select('*')
+            .eq('complaint_id', complaint.id)
+            .order('created_at', { ascending: true });
+
+        // Build response with related data
+        const complaintWithRelations = {
+            ...complaint,
+            ai_classification: aiClassification || null,
+            status_history: statusHistory || []
+        };
+
+        res.json({ success: true, complaint: complaintWithRelations });
+    } catch (error) {
+        console.error('Error fetching complaint:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

@@ -20,7 +20,7 @@ const services: Service[] = [
   {
     number: '112',
     title: 'National Emergency',
-    subtitle: 'Police · Fire · Health',
+    subtitle: 'Universal',
     description:
       'All-in-one national emergency number for police, fire, health, and related emergency response.',
     icon: <AlertTriangle size={30} strokeWidth={2} />,

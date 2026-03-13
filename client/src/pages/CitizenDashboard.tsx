@@ -1,23 +1,62 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Filter, Clock, CheckCircle2, AlertCircle, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+interface Complaint {
+    id: string;
+    complaint_number: string;
+    title: string;
+    status: string;
+    created_at: string;
+}
 
 const CitizenDashboard: React.FC = () => {
     const { user } = useAuth();
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    // Mock complaints for UI development
-    const complaints = [
-        { id: '1', number: 'MH-MUM-2024-001', title: 'Deep Pothole on S.V. Road', status: 'in_progress', date: '2024-03-12' },
-        { id: '2', number: 'MH-MUM-2024-002', title: 'Water Leakage in Bandra West', status: 'resolved', date: '2024-03-10' },
-        { id: '3', number: 'MH-MUM-2024-003', title: 'Garbage overflow near station', status: 'submitted', date: '2024-03-13' },
-    ];
+    useEffect(() => {
+        const fetchComplaints = async () => {
+            try {
+                if (!user?.id) return;
+                
+                const response = await fetch(`/api/complaints?citizen_id=${user.id}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    setComplaints(data.complaints || []);
+                } else {
+                    setError(data.error || 'Failed to fetch complaints');
+                }
+            } catch (err: any) {
+                setError(err.message || 'Error fetching complaints');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchComplaints();
+    }, [user?.id]);
+
+    const calculateStats = () => {
+        const total = complaints.length;
+        const pending = complaints.filter(c => c.status === 'submitted' || c.status === 'ai_processing').length;
+        const active = complaints.filter(c => c.status === 'under_review' || c.status === 'in_progress').length;
+        const resolved = complaints.filter(c => c.status === 'resolved').length;
+        return { total, pending, active, resolved };
+    };
+
+    const stats = calculateStats();
 
     const getStatusStyle = (status: string) => {
         switch (status) {
             case 'resolved': return 'bg-india-green-100 text-india-green-700 border-india-green-200';
-            case 'in_progress': return 'bg-navy-blue-100 text-navy-blue-700 border-navy-blue-200';
-            case 'submitted': return 'bg-saffron-100 text-saffron-700 border-saffron-200';
+            case 'in_progress':
+            case 'under_review': return 'bg-navy-blue-100 text-navy-blue-700 border-navy-blue-200';
+            case 'submitted':
+            case 'ai_processing': return 'bg-saffron-100 text-saffron-700 border-saffron-200';
             default: return 'bg-slate-100 text-slate-700 border-slate-200';
         }
     };
@@ -46,10 +85,10 @@ const CitizenDashboard: React.FC = () => {
             {/* Quick Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total', count: 3, icon: <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Clock size={16} /></div> },
-                    { label: 'Pending', count: 1, icon: <div className="p-2 bg-saffron-100 rounded-lg text-saffron-600"><AlertCircle size={16} /></div> },
-                    { label: 'Active', count: 1, icon: <div className="p-2 bg-navy-blue-100 rounded-lg text-navy-blue-600"><Clock size={16} /></div> },
-                    { label: 'Resolved', count: 1, icon: <div className="p-2 bg-india-green-100 rounded-lg text-india-green-600"><CheckCircle2 size={16} /></div> },
+                    { label: 'Total', count: stats.total, icon: <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Clock size={16} /></div> },
+                    { label: 'Pending', count: stats.pending, icon: <div className="p-2 bg-saffron-100 rounded-lg text-saffron-600"><AlertCircle size={16} /></div> },
+                    { label: 'Active', count: stats.active, icon: <div className="p-2 bg-navy-blue-100 rounded-lg text-navy-blue-600"><Clock size={16} /></div> },
+                    { label: 'Resolved', count: stats.resolved, icon: <div className="p-2 bg-india-green-100 rounded-lg text-india-green-600"><CheckCircle2 size={16} /></div> },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-4">
                         {stat.icon}
@@ -71,26 +110,41 @@ const CitizenDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="grid gap-4">
-                    {complaints.map((c) => (
-                        <Link key={c.id} to={`/complaint/${c.id}`} className="group p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-navy-blue-400 dark:hover:border-navy-blue-500 transition-all shadow-sm block">
-                            <div className="flex items-center justify-between gap-4">
-                                <div className="space-y-1">
-                                    <div className="text-xs font-mono font-bold text-saffron-600 uppercase tracking-tighter">{c.number}</div>
-                                    <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-navy-blue-600 transition-colors uppercase">{c.title}</h3>
-                                    <div className="text-sm text-slate-500 flex items-center gap-4">
-                                        <span>Filed on {new Date(c.date).toLocaleDateString()}</span>
-                                        <span>•</span>
-                                        <span>Ward 45</span>
+                {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                        <Loader className="animate-spin text-saffron-600" size={32} />
+                    </div>
+                ) : error ? (
+                    <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300">
+                        {error}
+                    </div>
+                ) : complaints.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <AlertCircle className="mx-auto mb-3 text-slate-400" size={32} />
+                        <p className="text-slate-600 dark:text-slate-400">No complaints yet. Create your first complaint!</p>
+                    </div>
+                ) : (
+                    <div className="grid gap-4">
+                        {complaints.map((c) => (
+                            <Link key={c.id} to={`/complaint/${c.id}`} className="group p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-navy-blue-400 dark:hover:border-navy-blue-500 transition-all shadow-sm block">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="text-xs font-mono font-bold text-saffron-600 uppercase tracking-tighter">{c.complaint_number}</div>
+                                        <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-navy-blue-600 transition-colors uppercase">{c.title}</h3>
+                                        <div className="text-sm text-slate-500 flex items-center gap-4">
+                                            <span>Filed on {new Date(c.created_at).toLocaleDateString()}</span>
+                                            <span>•</span>
+                                            <span>Ward 45</span>
+                                        </div>
+                                    </div>
+                                    <div className={cn("px-4 py-1.5 rounded-full text-xs font-bold border capitalize", getStatusStyle(c.status))}>
+                                        {c.status.replace(/_/g, ' ')}
                                     </div>
                                 </div>
-                                <div className={cn("px-4 py-1.5 rounded-full text-xs font-bold border capitalize", getStatusStyle(c.status))}>
-                                    {c.status.replace('_', ' ')}
-                                </div>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
+                            </Link>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

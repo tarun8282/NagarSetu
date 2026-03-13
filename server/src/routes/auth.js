@@ -163,22 +163,52 @@ router.post(
 
       console.log('OTP verified successfully');
 
-      // Create Supabase auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password: require('crypto').randomBytes(16).toString('hex'), // Random password not needed for OTP
-        email_confirm: true, // Mark email as confirmed since OTP was verified
-      });
+      // Check if user already exists in citizens table (profile already created)
+      const { data: existingProfile } = await supabase
+        .from('citizens')
+        .select('id')
+        .eq('email', email)
+        .single();
 
-      if (authError) {
-        console.error('Auth user creation error:', authError);
+      if (existingProfile) {
+        console.error('User already registered with this email');
         return res.status(400).json({
           success: false,
-          error: 'Failed to create auth user: ' + authError.message,
+          error: 'Email already registered. Please login instead.',
         });
       }
 
-      console.log('Auth user created:', authData.user.id);
+      // Check if auth user already exists (orphaned auth user from failed registration)
+      let authData = null;
+      let existingAuthUser = null;
+      const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
+      
+      if (!listError && userList.users) {
+        existingAuthUser = userList.users.find(u => u.email === email);
+      }
+
+      if (existingAuthUser) {
+        console.log('Using existing auth user:', existingAuthUser.id);
+        authData = { user: existingAuthUser };
+      } else {
+        // Create new Supabase auth user
+        const { data: newAuthData, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password: require('crypto').randomBytes(16).toString('hex'), // Random password not needed for OTP
+          email_confirm: true, // Mark email as confirmed since OTP was verified
+        });
+
+        if (authError) {
+          console.error('Auth user creation error:', authError);
+          return res.status(400).json({
+            success: false,
+            error: 'Failed to create auth user: ' + authError.message,
+          });
+        }
+
+        authData = newAuthData;
+        console.log('Auth user created:', authData.user.id);
+      }
 
       // Create profile
       const { data: profile, error: profileError } = await supabase
