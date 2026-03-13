@@ -30,10 +30,13 @@ CREATE TABLE public.departments (
 );
 
 -- 4. Profiles Table (Extends Auth.Users)
+--    - email: UNIQUE, used for Email-OTP authentication
+--    - phone: no UNIQUE constraint (duplicate phone numbers allowed)
 CREATE TABLE public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name TEXT,
-    phone TEXT UNIQUE,
+    email TEXT UNIQUE,
+    phone TEXT,
     role TEXT CHECK (role IN ('citizen', 'dept_officer', 'mc_admin', 'state_admin')),
     state_id UUID REFERENCES public.states(id),
     city_id UUID REFERENCES public.cities(id),
@@ -42,6 +45,10 @@ CREATE TABLE public.profiles (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Indexes for Profiles
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
+CREATE INDEX IF NOT EXISTS idx_profiles_phone ON public.profiles(phone);
 
 -- 5. Complaints Table
 CREATE TABLE public.complaints (
@@ -115,7 +122,7 @@ ALTER TABLE public.complaint_media ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_classifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.status_history ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies (Simplified for Hackathon, following logic in spec)
+-- RLS Policies
 
 -- Profiles: Users can read all profiles (to see officer names etc), but only update their own
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles FOR SELECT USING (true);
@@ -123,53 +130,53 @@ CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING
 
 -- Complaints:
 -- Citizens: See only their own
-CREATE POLICY "Citizens can view own complaints" ON public.complaints FOR SELECT 
+CREATE POLICY "Citizens can view own complaints" ON public.complaints FOR SELECT
 USING (auth.uid() = citizen_id);
 
 -- Dept Officers: See complaints in their city and department
-CREATE POLICY "Officers can view complaints in their dept" ON public.complaints FOR SELECT 
+CREATE POLICY "Officers can view complaints in their dept" ON public.complaints FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() 
-    AND role = 'dept_officer' 
-    AND city_id = public.complaints.city_id 
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND role = 'dept_officer'
+    AND city_id = public.complaints.city_id
     AND department_id = public.complaints.assigned_department_id
   )
 );
 
 -- MC Admin: See complaints in their city
-CREATE POLICY "MC Admins can view all complaints in city" ON public.complaints FOR SELECT 
+CREATE POLICY "MC Admins can view all complaints in city" ON public.complaints FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() 
-    AND role = 'mc_admin' 
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND role = 'mc_admin'
     AND city_id = public.complaints.city_id
   )
 );
 
 -- State Admin: See complaints in their state
-CREATE POLICY "State Admins can view all complaints in state" ON public.complaints FOR SELECT 
+CREATE POLICY "State Admins can view all complaints in state" ON public.complaints FOR SELECT
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() 
-    AND role = 'state_admin' 
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND role = 'state_admin'
     AND state_id = public.complaints.state_id
   )
 );
 
 -- Insert policy for citizens
-CREATE POLICY "Citizens can insert complaints" ON public.complaints FOR INSERT 
+CREATE POLICY "Citizens can insert complaints" ON public.complaints FOR INSERT
 WITH CHECK (auth.uid() = citizen_id);
 
 -- Update policy for officers and admins
-CREATE POLICY "Officers and Admins can update complaints" ON public.complaints FOR UPDATE 
+CREATE POLICY "Officers and Admins can update complaints" ON public.complaints FOR UPDATE
 USING (
   EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() 
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
     AND role IN ('dept_officer', 'mc_admin')
   )
 );
