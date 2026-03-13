@@ -36,20 +36,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        fetchProfile(session.user);
-      } else {
+    // Initialize auth state
+    const initializeAuth = async () => {
+      try {
+        setLoading(true);
+        
+        // First, check localStorage for stored user session (fastest restore)
+        const storedUser = localStorage.getItem('app_user_session');
+        if (storedUser) {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            setLoading(false);
+            return;
+          } catch (e) {
+            console.error('Error parsing stored user:', e);
+            localStorage.removeItem('app_user_session');
+          }
+        }
+        
+        // Then try to get the Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          fetchProfile(session.user);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
         setLoading(false);
       }
-    });
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
         fetchProfile(session.user);
       } else {
+        localStorage.removeItem('app_user_session');
         setUser(null);
         setLoading(false);
       }
@@ -84,22 +110,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      if (profileData) {
-        setUser({ ...sessionUser, ...profileData } as AppUser);
-      } else {
-        setUser(sessionUser as AppUser);
-      }
+      const userData = profileData ? { ...sessionUser, ...profileData } : sessionUser;
+      const appUser = userData as AppUser;
+      
+      // Save to localStorage for persistence across page refreshes (10-year session)
+      localStorage.setItem('app_user_session', JSON.stringify(appUser));
+      
+      setUser(appUser);
     } catch (error) {
       console.error('Error fetching profile:', error);
-      setUser(sessionUser as AppUser);
+      const appUser = sessionUser as AppUser;
+      // Still save to localStorage even if profile fetch fails
+      localStorage.setItem('app_user_session', JSON.stringify(appUser));
+      setUser(appUser);
     } finally {
       setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      localStorage.removeItem('app_user_session');
+      await supabase.auth.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      localStorage.removeItem('app_user_session');
+      setUser(null);
+    }
   };
 
   const sendRegistrationOTPHandler = async (email: string, fullName: string, mobileNo: string) => {
@@ -122,6 +160,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await authAPI.verifyOTPAndSignUp(email, fullName, mobileNo, otp, password, cityId, stateId);
 
     if (response.success && response.data?.user) {
+      // Set session in Supabase if provided by backend
+      if (response.data?.session) {
+        try {
+          await supabase.auth.setSession(response.data.session);
+        } catch (error) {
+          console.error('Error setting session:', error);
+        }
+      }
       await fetchProfile(response.data.user);
     }
 
@@ -132,6 +178,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await authAPI.citizenLogin(email, password);
 
     if (response.success && response.data?.user) {
+      // Set session in Supabase if provided by backend
+      if (response.data?.session) {
+        try {
+          await supabase.auth.setSession(response.data.session);
+        } catch (error) {
+          console.error('Error setting session:', error);
+        }
+      }
       await fetchProfile(response.data.user);
     }
 
@@ -142,6 +196,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await authAPI.adminLogin(username, password);
 
     if (response.success && response.data?.user) {
+      // Set session in Supabase if provided by backend
+      if (response.data?.session) {
+        try {
+          await supabase.auth.setSession(response.data.session);
+        } catch (error) {
+          console.error('Error setting session:', error);
+        }
+      }
       await fetchProfile(response.data.user);
     }
 

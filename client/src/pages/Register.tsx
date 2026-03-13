@@ -144,7 +144,7 @@ const Register: React.FC = () => {
       <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md space-y-6">
         {/* Header */}
         <div className="space-y-2 text-center">
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Join NagarSetu</h2>
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-white font-deva">Join NagarSetu</h2>
           <p className="text-slate-500 dark:text-slate-400">Be the bridge to a better city</p>
         </div>
 
@@ -158,7 +158,7 @@ const Register: React.FC = () => {
 
         {/* Success message */}
         {successMessage && (
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl text-green-700 dark:text-green-400 text-sm flex gap-3">
+          <div className="p-4 bg-india-green-50 dark:bg-india-green-900/20 border border-india-green-200 dark:border-india-green-800 rounded-2xl text-india-green-700 dark:text-india-green-400 text-sm flex gap-3">
             <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <span>{successMessage}</span>
           </div>
@@ -176,8 +176,7 @@ const Register: React.FC = () => {
                 type="text"
                 value={fullName}
                 onChange={handleFullNameChange}
-                placeholder="John Doe"
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent transition-all shadow-sm"
                 disabled={loading}
               />
             </div>
@@ -191,8 +190,7 @@ const Register: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={handleEmailChange}
-                placeholder="john@example.com"
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent transition-all shadow-sm"
                 disabled={loading}
               />
             </div>
@@ -211,7 +209,7 @@ const Register: React.FC = () => {
                   value={mobileNo}
                   onChange={handleMobileChange}
                   placeholder="Enter mobile number"
-                  className="flex-1 px-4 py-3 rounded-r-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="flex-1 px-4 py-3 rounded-r-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent transition-all shadow-sm"
                   disabled={loading}
                 />
               </div>
@@ -226,8 +224,7 @@ const Register: React.FC = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent transition-all shadow-sm"
                 disabled={loading}
               />
             </div>
@@ -236,7 +233,7 @@ const Register: React.FC = () => {
             <button
               type="submit"
               disabled={loading || !fullName || !email || !mobileNo || password.length < 8}
-              className="w-full py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-lg bg-saffron hover:bg-saffron-600 shadow-md shadow-saffron-200/50 dark:shadow-none disabled:bg-slate-400 disabled:shadow-none text-white font-bold transition-all flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}
               {loading ? 'Sending OTP...' : 'Send OTP to Email'}
@@ -248,7 +245,7 @@ const Register: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+                className="text-saffron-600 hover:text-saffron-700 dark:text-saffron-400 font-bold transition-colors"
               >
                 Login here
               </button>
@@ -276,7 +273,7 @@ const Register: React.FC = () => {
                   value={digit}
                   onChange={(e) => handleOTPChange(index, e.target.value.slice(-1))}
                   maxLength={1}
-                  className="w-12 h-12 text-center text-2xl rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="w-12 h-12 text-center text-2xl rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-saffron-500 focus:ring-2 focus:ring-saffron-500/20 transition-all shadow-sm"
                   disabled={loading}
                   inputMode="numeric"
                 />
@@ -289,7 +286,7 @@ const Register: React.FC = () => {
                 type="button"
                 onClick={handleResendOTP}
                 disabled={loading}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+                className="text-sm text-saffron-600 hover:text-saffron-700 dark:text-saffron-400 font-bold transition-colors"
               >
                 Didn't receive OTP? Resend
               </button>
@@ -299,7 +296,7 @@ const Register: React.FC = () => {
             <button
               type="submit"
               disabled={loading || otp.join('').length !== 6}
-              className="w-full py-3 px-4 rounded-lg bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-lg bg-india-green-500 hover:bg-india-green-600 shadow-md shadow-india-green-200/50 dark:shadow-none disabled:bg-slate-400 disabled:shadow-none text-white font-bold transition-all flex items-center justify-center gap-2"
             >
               {loading && <Loader className="w-4 h-4 animate-spin" />}
               {loading ? 'Verifying...' : 'Create Account'}
@@ -322,7 +319,7 @@ const Register: React.FC = () => {
         {/* Step 3: Success */}
         {step === 'success' && (
           <div className="text-center space-y-4">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
+            <CheckCircle className="w-16 h-16 text-india-green-500 mx-auto" />
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">
               Account Created!
             </h3>

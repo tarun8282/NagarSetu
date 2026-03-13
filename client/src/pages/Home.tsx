@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, MapPin, ShieldCheck, Clock } from 'lucide-react';
+import { AnimatedText } from '../components/ui/animated-underline-text-one';
 
 const Home: React.FC = () => {
   return (
@@ -8,14 +9,19 @@ const Home: React.FC = () => {
       {/* Hero Section */}
       <section className="relative py-20 px-4 overflow-hidden">
         {/* Ashoka Chakra Watermark */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.12] dark:opacity-[0.03] text-saffron dark:text-white select-none pointer-events-none z-0">
-          <svg width="600" height="600" viewBox="0 0 100 100" className="animate-[spin_120s_linear_infinite]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.12] dark:opacity-[0.03] text-saffron dark:text-white select-none pointer-events-none z-0 flex items-center justify-center">
+          <svg width="600" height="600" viewBox="0 0 100 100" className="opacity-80 animate-[spin_120s_linear_infinite]">
             <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" />
             <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="1" />
             {[...Array(24)].map((_, i) => (
               <line key={i} x1="50" y1="50" x2="50" y2="5" stroke="currentColor" strokeWidth="1" transform={`rotate(${i * 15} 50 50)`} />
             ))}
           </svg>
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/commons/1/17/State_Emblem_of_India_%28black%29.svg" 
+            alt="Emblem of India"
+            className="absolute w-[200px] opacity-80 mix-blend-multiply dark:invert dark:mix-blend-screen"
+          />
         </div>
 
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-full bg-saffron/5 blur-[120px] -z-10 rounded-full"></div>
@@ -23,9 +29,12 @@ const Home: React.FC = () => {
         <div className="relative max-w-7xl mx-auto grid md:grid-cols-[1fr,400px] gap-12 items-center z-10">
           {/* Left Column (Content) */}
           <div className="text-center md:text-left space-y-6">
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white font-deva">
-              <span className="text-saffron">Nagar</span><span className="text-india-green">Setu</span>
-            </h1>
+            <AnimatedText 
+              text="NagarSetu" 
+              className="md:items-start"
+              textClassName="text-5xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-r from-[#FF9933] to-[#128807] bg-clip-text text-transparent italic font-deva [text-shadow:_0_1px_0_rgb(0_0_0_/_5%)]"
+              underlineClassName="text-navy-blue dark:text-saffron-400"
+            />
             <p className="text-2xl text-slate-600 dark:text-slate-400/90 font-medium italic font-deva">
               Connecting citizens to municipal care.
             </p>
@@ -44,19 +53,26 @@ const Home: React.FC = () => {
           </div>
 
           {/* Right Column (PM's Photo) */}
-          <div className="relative aspect-[400/440] rounded-xl overflow-hidden shadow-2xl border border-slate-100 dark:border-slate-800">
+          <div className="relative aspect-[400/440] rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800">
             <img
               src="/01.png"
               alt="Hon'ble Prime Minister Narendra Modi"
               className="w-full h-full object-cover object-top"
             />
-            <div className="absolute bottom-0 left-0 right-0 p-5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.15)]">
+            <div className="absolute bottom-0 left-0 right-0 p-5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
               <p className="text-center text-sm font-bold text-slate-900 dark:text-white mb-1">Hon'ble Prime Minister Narendra Modi</p>
               <p className="text-center text-[10px] md:text-xs text-saffron font-semibold uppercase tracking-widest leading-none">A vision for a clean, digitally connected India</p>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Wavy Red Line Separator Spanning Full Width */}
+      <div className="w-screen relative left-1/2 right-1/2 -mx-[50vw] my-12 overflow-hidden flex items-center justify-center pointer-events-none">
+         <svg className="w-full h-[12px] sm:h-[16px] text-red-600 drop-shadow-[0_0_10px_rgba(220,38,38,0.6)]" preserveAspectRatio="none" viewBox="0 0 1440 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,12 Q360,24 720,12 T1440,12" stroke="currentColor" strokeWidth="6" strokeLinecap="round" fill="none"/>
+         </svg>
+      </div>
 
       {/* Features Grid */}
       <section className="container mx-auto px-4 grid md:grid-cols-3 gap-8">

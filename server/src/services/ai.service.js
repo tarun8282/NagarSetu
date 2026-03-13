@@ -20,7 +20,7 @@ async function validateAndClassify(complaintData, images = []) {
 You are an AI gatekeeper for a government civic complaint portal in India.
 Your job is to:
 1. Determine if this is a GENUINE civic/municipal complaint worth registering.
-2. If valid, classify it with full details.
+2. If valid, classify it with full details including the correct department.
 
 Complaint Title: ${title}
 Complaint Description: ${description}
@@ -40,36 +40,90 @@ Mark is_valid as TRUE if it describes a real, actionable civic problem.
 road_pothole, road_damage, water_leakage, water_shortage, garbage_overflow,
 garbage_collection, electricity_outage, streetlight, sanitation_drain,
 sanitation_toilet, illegal_construction, noise_pollution, encroachment,
-stray_animals, tree_fallen, flooding, other
+stray_animals, tree_fallen, flooding, park_damage, building_permit,
+fire_hazard, environment_pollution, other
 
---- SEVERITY ---
-- critical: Life risk (road collapse, electrical hazard, major flooding)
-- high: Major impact (main road pothole, large water leak, downed tree)
-- medium: Moderate impact (irregular garbage, broken streetlight, minor leak)
-- low: Minor impact (minor cracks, aesthetic issues, small encroachment)
+--- SEVERITY RULES (assign carefully based on actual impact) ---
+CRITICAL — Immediate threat to life or safety:
+  • Road collapse, sinkhole, or bridge damage
+  • Live/exposed electrical wires or major electrical hazard
+  • Major flooding blocking roads or entering homes
+  • Sewage overflow into drinking water supply
+  • Fire hazard or active fire risk
+  • Fallen tree blocking main road or on a building
+  • Complete water supply failure in an area
 
---- DEPARTMENT LOGIC ---
-Identify the correct Municipal Corporation based on the city/location provided. 
-Examples:
+HIGH — Major disruption to daily life:
+  • Large potholes on main roads causing accidents
+  • Significant water pipeline burst or major leak
+  • Garbage not collected for 5+ days causing health risk
+  • Complete electricity outage for a colony/area
+  • Blocked main drainage causing waterlogging
+  • Illegal construction actively in progress
+  • Stray animal attack risk (pack of dogs, etc.)
+
+MEDIUM — Moderate inconvenience, needs timely action:
+  • Potholes on side streets or lanes
+  • Minor water leakage or dripping pipes
+  • Irregular garbage collection (missed 2–3 days)
+  • Broken or non-functional streetlight
+  • Partially blocked drain
+  • Minor encroachment on footpath
+  • Single stray animal complaint
+  • Noise pollution complaint
+  • Minor road cracks not causing accidents
+
+LOW — Minor issue, cosmetic or low-impact:
+  • Minor pavement cracks or uneven tiles
+  • Overgrown grass in parks
+  • Faded road markings
+  • Small pothole in low-traffic lane
+  • Aesthetic damage to public infrastructure
+  • Minor water seepage (not a burst pipe)
+
+--- DEPARTMENT MAPPING ---
+Assign department_name based on the category AND the correct municipal body for the city.
+
+First, identify the Municipal Corporation:
 - Mumbai → BMC (Brihanmumbai Municipal Corporation)
 - Ulhasnagar → UMC (Ulhasnagar Municipal Corporation)
 - Thane → TMC (Thane Municipal Corporation)
 - Pune → PMC (Pune Municipal Corporation)
 - Navi Mumbai → NMMC (Navi Mumbai Municipal Corporation)
-- Kalyan-Dombivli → KDMC
+- Kalyan-Dombivli → KDMC (Kalyan-Dombivli Municipal Corporation)
 - Delhi → MCD (Municipal Corporation of Delhi)
-- Bengaluru → BBMP
-- Chennai → GCC
-If the city is not in this list, follow the pattern: [City Name] Municipal Corporation.
+- Bengaluru → BBMP (Bruhat Bengaluru Mahanagara Palike)
+- Chennai → GCC (Greater Chennai Corporation)
+- Hyderabad → GHMC (Greater Hyderabad Municipal Corporation)
+- Ahmedabad → AMC (Ahmedabad Municipal Corporation)
+- For any other city: [City Name] Municipal Corporation
 
-Return ONLY valid JSON in this exact format:
+Then append the correct department division based on category:
+- road_pothole, road_damage → "[CORP] - Public Works Department"
+- water_leakage, water_shortage → "[CORP] - Water Supply Department"
+- garbage_overflow, garbage_collection → "[CORP] - Solid Waste Management Department"
+- electricity_outage, streetlight → "[CORP] - Electrical Department"
+- sanitation_drain, sanitation_toilet → "[CORP] - Sewerage and Drainage Department"
+- illegal_construction, building_permit → "[CORP] - Building and Construction Department"
+- encroachment → "[CORP] - Town Planning Department"
+- noise_pollution, environment_pollution → "[CORP] - Environment Department"
+- stray_animals → "[CORP] - Health Department"
+- tree_fallen, park_damage → "[CORP] - Garden and Parks Department"
+- flooding → "[CORP] - Sewerage and Drainage Department"
+- fire_hazard → "[CORP] - Fire Department"
+- other → "[CORP] - Administration Department"
+
+Example: A pothole in Mumbai → "BMC - Public Works Department"
+Example: Water leak in Pune → "PMC - Water Supply Department"
+
+Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {
   "is_valid": true,
   "rejection_reason": null,
   "category": "road_pothole",
-  "severity": "high",
-  "department_name": "BMC Pothole Section",
-  "reasoning": "Very short one-sentence summary (max 10 words)",
+  "severity": "medium",
+  "department_name": "BMC - Public Works Department",
+  "reasoning": "Pothole on side lane causing minor disruption",
   "confidence_score": 0.92
 }
 
@@ -106,6 +160,15 @@ If rejecting, return:
         // Ensure required fields exist
         if (typeof parsed.is_valid !== 'boolean') {
             throw new Error('Gemini response missing is_valid field.');
+        }
+
+        // Validate severity value if complaint is valid
+        if (parsed.is_valid) {
+            const validSeverities = ['critical', 'high', 'medium', 'low'];
+            if (!validSeverities.includes(parsed.severity)) {
+                console.warn(`Unexpected severity value: ${parsed.severity}, defaulting to 'medium'`);
+                parsed.severity = 'medium';
+            }
         }
 
         return parsed;

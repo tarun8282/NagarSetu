@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
+import Footer from './components/layout/Footer';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -13,6 +14,7 @@ import ComplaintDetail from './pages/ComplaintDetail';
 import ComplaintForm from './pages/ComplaintForm';
 import HeatmapView from './pages/HeatmapView';
 import Emergency from './pages/Emergency';
+import Alerts from './pages/Alerts';
 import { useAuth } from './context/AuthContext';
 
 const App: React.FC = () => {
@@ -23,7 +25,6 @@ const App: React.FC = () => {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
-  // Emergency page — full-screen standalone, no Navbar / container
   if (location.pathname === '/emergency') {
     return (
       <Routes>
@@ -41,19 +42,24 @@ const App: React.FC = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Protected Routes */}
+          {/* Citizen */}
           <Route path="/dashboard" element={user ? <CitizenDashboard /> : <Navigate to="/login" />} />
+          <Route path="/alerts" element={user ? <Alerts /> : <Navigate to="/login" />} />
           <Route path="/complaint/new" element={user ? <ComplaintForm /> : <Navigate to="/login" />} />
           <Route path="/complaint/:id" element={user ? <ComplaintDetail /> : <Navigate to="/login" />} />
 
+          {/* Officer — all three routes from admin-login branch */}
           <Route path="/officer/dashboard" element={user?.role === 'dept_officer' ? <OfficerDashboard /> : <Navigate to="/login" />} />
           <Route path="/officer/complaints" element={user?.role === 'dept_officer' ? <OfficerComplaints /> : <Navigate to="/login" />} />
           <Route path="/officer/analytics" element={user?.role === 'dept_officer' ? <OfficerAnalytics /> : <Navigate to="/login" />} />
-          <Route path="/admin/dashboard" element={['mc_admin', 'state_admin'].includes(user?.role) ? <AdminDashboard /> : <Navigate to="/login" />} />
+
+          {/* Admin — type-safe check from main branch */}
+          <Route path="/admin/dashboard" element={user?.role && ['mc_admin', 'state_admin'].includes(user.role) ? <AdminDashboard /> : <Navigate to="/login" />} />
 
           <Route path="/heatmap" element={<HeatmapView />} />
         </Routes>
       </main>
+      <Footer />
     </div>
   );
 };

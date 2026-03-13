@@ -1,0 +1,4 @@
+﻿src/App.tsx(4,20): error TS2307: Cannot find module './components/layout/Footer' or its corresponding type declarations.
+src/App.tsx(15,20): error TS2307: Cannot find module './pages/Alerts' or its corresponding type declarations.
+src/components/AIVoiceInputDemo.tsx(5,10): error TS6133: 'recordings' is declared but its value is never read.
+src/lib/supabase.ts(22,5): error TS2353: Object literal may only specify known properties, and 'expiresIn' does not exist in type '{ autoRefreshToken?: boolean | undefined; storageKey?: string | undefined; persistSession?: boolean | undefined; detectSessionInUrl?: boolean | ((url: URL, params: { [parameter: string]: string; }) => boolean) | undefined; ... 5 more ...; throwOnError?: boolean | undefined; }'.

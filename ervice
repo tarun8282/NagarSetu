@@ -1,0 +1,51 @@
+[33m4e23c86[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mprompt[m[33m, [m[1;31morigin/prompt[m[33m)[m model prompt updated
+[33mbe296af[m Merge pull request #17 from tarun8282/location
+[33m7ac7b1a[m[33m ([m[1;31morigin/location[m[33m)[m location and heapmap updated
+[33m2da9dc3[m Merge pull request #16 from tarun8282/ttemp
+[33mfab2556[m[33m ([m[1;31morigin/ttemp[m[33m)[m ui changes
+[33m2d36c09[m Merge pull request #15 from tarun8282/alert-system
+[33m09e10c9[m[33m ([m[1;31morigin/alert-system[m[33m)[m alert system updated
+[33m086ba7c[m Merge pull request #14 from tarun8282/lang
+[33mfd04e8a[m[33m ([m[1;31morigin/lang[m[33m)[m lang system
+[33ma44b623[m[33m ([m[1;32mforgot-password[m[33m)[m Merge pull request #13 from tarun8282/ui
+[33m77b3157[m[33m ([m[1;31morigin/ui[m[33m)[m signup and login page ui updated
+[33m95c8574[m Merge pull request #12 from tarun8282/microphone
+[33ma2addff[m[33m ([m[1;31morigin/microphone[m[33m)[m microphone feature added in description
+[33m2219595[m Merge branch 'main' of https://github.com/tarun8282/MEGAHACK-2026_FRESHERS
+[33m72d0a94[m Merge pull request #11 from tarun8282/language-system
+[33madfd810[m Merge branch 'main' of https://github.com/tarun8282/MEGAHACK-2026_FRESHERS
+[33m7f1d740[m Merge branch 'language-system'
+[33m76d6b2c[m Merge pull request #10 from tarun8282/language-system
+[33m25d4814[m Merge pull request #9 from tarun8282/ui_components
+[33m106ec18[m[33m ([m[1;31morigin/language-system[m[33m)[m multi language support
+[33m0908215[m[33m ([m[1;31morigin/ui_components[m[33m)[m  ui components added
+[33m380e36f[m[33m ([m[1;31morigin/refresh[m[33m)[m refresh page problem solved
+[33mf44837b[m main working
+[33m74e27e5[m main again
+[33m80dbf53[m Merge branch 'main' of https://github.com/tarun8282/MEGAHACK-2026_FRESHERS
+[33m259276a[m feat: Fix session persistence and remove session timeout
+[33m96696e5[m Merge pull request #8 from tarun8282/refresh
+[33mefe6402[m session timeout removed
+[33mfc05498[m Merge pull request #7 from tarun8282/password
+[33mc210978[m[33m ([m[1;31morigin/temp[m[33m, [m[1;31morigin/password[m[33m)[m Password working now
+[33m28c835a[m Merge pull request #6 from tarun8282/heap
+[33m3bc368e[m[33m ([m[1;31morigin/heap[m[33m)[m Merge branch 'main' into heap
+[33mddcf4ad[m Merge pull request #5 from tarun8282/copilot/add-readme-for-project-setup
+[33m1fb9884[m filters and heap map is working properly
+[33m4de223d[m[33m ([m[1;31morigin/copilot/add-readme-for-project-setup[m[33m)[m Add comprehensive README.md with setup instructions and documentation
+[33mc9106d5[m Initial plan
+[33m73f5d5e[m Merge pull request #4 from tarun8282/solvingcomplaintsumbition
+[33mbce5b46[m[33m ([m[1;31morigin/solvingcomplaintsumbition[m[33m)[m Merge branch 'main' into solvingcomplaintsumbition
+[33mbb98103[m complaint summbition and ai working
+[33m79a0d6d[m[33m ([m[1;31morigin/hardcode[m[33m)[m hardcoded data shifted to manual entries
+[33mb32e807[m[33m ([m[1;31morigin/sos-implementation[m[33m)[m fix: stop navbar shake + change 112 subtitle to Universal
+[33m7f3972d[m Everything working till now ! and updated sql schema
+[33mfbd114a[m Merge pull request #3 from tarun8282/ui
+[33m8caf73b[m Merge branch 'main' into ui
+[33m1519769[m ui patriotic
+[33m1db6394[m Merge pull request #2 from tarun8282/sos-implementation
+[33ma747b73[m Merge pull request #1 from tarun8282/auth
+[33m7d5b114[m feat: add SOS button and dedicated Emergency Services page
+[33md9e7568[m[33m ([m[1;31morigin/auth[m[33m)[m auth with otp working
+[33m55b95d9[m File Structure Updated
+[33ma2b1dcd[m Initial commit
