@@ -112,18 +112,57 @@ router.post('/', upload.array('media', 5), async (req, res) => {
         // 7. Generate complaint number
         const complaintNumber = `MH-MUM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+        // 7.5. Look up real city_id if not explicitly provided
+        let resolvedCityId = city_id || null;
+        if (!resolvedCityId && city && city !== 'Unknown') {
+            try {
+                const { data: dbCity } = await supabase
+                    .from('cities')
+                    .select('id')
+                    .ilike('name', city)
+                    .limit(1)
+                    .maybeSingle();
+                if (dbCity) resolvedCityId = dbCity.id;
+            } catch (err) {
+                console.warn('[DB] City lookup failed:', err.message);
+            }
+        }
+
         // 8. Look up department
         let assignedDeptId = null;
         let slaHours = 24;
+
+        // Map AI strict categories to realistic DB category slugs
+        const categoryMap = {
+            'road_pothole': 'pwd', 'road_damage': 'pwd',
+            'water_leakage': 'water', 'water_shortage': 'water',
+            'garbage_overflow': 'solidwaste', 'garbage_collection': 'solidwaste',
+            'electricity_outage': 'pwd', 'streetlight': 'pwd',
+            'sanitation_drain': 'sewerage', 'sanitation_toilet': 'sewerage', 'flooding': 'sewerage',
+            'illegal_construction': 'building', 'building_permit': 'building',
+            'encroachment': 'townplanning',
+            'noise_pollution': 'environment', 'environment_pollution': 'environment',
+            'stray_animals': 'health',
+            'tree_fallen': 'gardens', 'park_damage': 'gardens',
+            'fire_hazard': 'fire',
+            'other': 'admin'
+        };
+        const mappedSlug = categoryMap[aiResult.category] || 'admin';
+
         try {
-            const { data: dept } = await supabase
+            let deptQuery = supabase
                 .from('departments')
                 .select('id, sla_hours')
-                .eq('category_slug', aiResult.category)
-                .maybeSingle();
-            if (dept) {
-                assignedDeptId = dept.id;
-                slaHours = dept.sla_hours || 24;
+                .eq('category_slug', mappedSlug);
+
+            if (resolvedCityId) {
+                deptQuery = deptQuery.eq('city_id', resolvedCityId);
+            }
+
+            const { data: deptDepts, error: deptError } = await deptQuery.limit(1);
+            if (!deptError && deptDepts && deptDepts.length > 0) {
+                assignedDeptId = deptDepts[0].id;
+                slaHours = deptDepts[0].sla_hours || 24;
             }
         } catch (deptErr) {
             console.warn('[DB] Department lookup failed:', deptErr.message);
@@ -140,7 +179,7 @@ router.post('/', upload.array('media', 5), async (req, res) => {
                 latitude: latitude ? parseFloat(latitude) : null,
                 longitude: longitude ? parseFloat(longitude) : null,
                 address: resolvedAddress,
-                city_id: city_id || null,
+                city_id: resolvedCityId,
                 state_id: state_id || null,
                 status: 'under_review',
                 category: aiResult.category,
@@ -172,11 +211,13 @@ router.post('/', upload.array('media', 5), async (req, res) => {
             remarks: `AI validated and classified as ${aiResult.category} (${aiResult.severity}). Confidence: ${(aiResult.confidence_score * 100).toFixed(0)}%`
         });
 
-        // 12. Upload media to Supabase Storage (async, non-blocking)
+        // 12. Upload media to Supabase Storage
         if (mediaFiles.length > 0) {
-            uploadMediaFiles(complaint.id, citizen_id, mediaFiles).catch(err =>
-                console.error('[Storage] Media upload failed:', err.message)
-            );
+            try {
+                await uploadMediaFiles(complaint.id, citizen_id, mediaFiles);
+            } catch (err) {
+                console.error('[Storage] Media upload failed:', err.message);
+            }
         }
 
         // 13. Return success
@@ -218,7 +259,7 @@ async function uploadMediaFiles(complaintId, uploadedBy, files) {
                 .from('complaint-media')
                 .getPublicUrl(storagePath);
 
-            await supabase.from('complaint_media').insert({
+            const { error: dbError } = await supabase.from('complaint_media').insert({
                 complaint_id: complaintId,
                 storage_path: storagePath,
                 public_url: urlData.publicUrl,
@@ -226,6 +267,11 @@ async function uploadMediaFiles(complaintId, uploadedBy, files) {
                 is_resolution_proof: false,
                 uploaded_by: uploadedBy
             });
+
+            if (dbError) {
+                console.error(`[DB] Failed to insert media record for ${file.originalname}:`, dbError.message);
+                continue;
+            }
 
             console.log(`[Storage] Uploaded: ${storagePath}`);
         } catch (err) {
@@ -251,7 +297,7 @@ router.get('/', async (req, res) => {
                     .select('*')
                     .eq('complaint_id', complaint.id)
                     .single();
-                
+
                 const { data: media } = await supabase
                     .from('complaint_media')
                     .select('*')
@@ -350,7 +396,7 @@ router.patch('/:id/status', upload.array('proof', 1), async (req, res) => {
             remarks
         });
 
-        // 4. Handle Proof if any
+        // 4. Handle proof files if any
         if (proofFiles.length > 0) {
             for (const file of proofFiles) {
                 const storagePath = `proofs/${id}/${Date.now()}-${file.originalname}`;
@@ -380,6 +426,7 @@ router.patch('/:id/status', upload.array('proof', 1), async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 // POST /api/complaints/:id/evidence — add evidence photo (shows in Evidence Gallery)
 router.post('/:id/evidence', upload.single('evidence'), async (req, res) => {
     try {
@@ -389,7 +436,6 @@ router.post('/:id/evidence', upload.single('evidence'), async (req, res) => {
 
         if (!file) return res.status(400).json({ success: false, error: 'No file provided' });
 
-        const ext = path.extname(file.originalname) || '.jpg';
         const storagePath = `evidence/${id}/${Date.now()}-${file.originalname}`;
 
         const { error: uploadErr } = await supabase.storage
@@ -420,4 +466,4 @@ router.post('/:id/evidence', upload.single('evidence'), async (req, res) => {
     }
 });
 
-module.exports = router;
+module.exports = router;

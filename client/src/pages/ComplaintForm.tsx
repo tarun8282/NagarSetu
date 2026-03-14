@@ -15,7 +15,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
 
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;   // 5 MB
 const VIDEO_MAX_BYTES = 30 * 1024 * 1024;  // 30 MB
@@ -32,6 +32,37 @@ interface MediaFile {
   file: File;
   previewUrl: string | null;
   sizeError: string | null;
+}
+
+function SuccessScreen({ trackingId, onGoDashboard }: { trackingId: string; onGoDashboard: () => void }) {
+  return (
+    <div className="max-w-2xl mx-auto text-center space-y-8 py-12 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-24 h-24 rounded-full bg-india-green border-4 border-india-green-100 dark:border-india-green-900/40 flex items-center justify-center shadow-2xl shadow-india-green-200/50 dark:shadow-none">
+          <CheckCircle2 size={50} className="text-white" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white font-deva">Report Submitted!</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-lg max-w-md mx-auto">
+            Thank you for your report. Our AI has successfully classified and routed it to the correct department.
+          </p>
+        </div>
+        <div className="w-full max-w-sm p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Tracking ID</p>
+          <div className="text-3xl font-mono font-bold tracking-wider text-saffron dark:text-saffron-400 bg-white dark:bg-slate-800 py-3 rounded-lg border border-slate-100 dark:border-slate-700 shadow-inner">
+            {trackingId}
+          </div>
+          <p className="text-xs text-slate-400 mt-4">Keep this ID safe to track your complaint status.</p>
+        </div>
+      </div>
+      <button
+        onClick={onGoDashboard}
+        className="inline-flex items-center justify-center gap-2 px-10 py-4 w-full sm:w-auto bg-navy-blue text-white rounded-xl font-bold hover:bg-navy-blue-600 shadow-xl shadow-navy-blue-200/50 dark:shadow-none transition-all text-lg"
+      >
+        Go to My Dashboard
+      </button>
+    </div>
+  );
 }
 
 function RejectedScreen({ reason, onReset }: { reason: string; onReset: () => void }) {
@@ -79,6 +110,7 @@ const ComplaintForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rejectedReason, setRejectedReason] = useState<string | null>(null);
+  const [submittedComplaintNo, setSubmittedComplaintNo] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -176,7 +208,7 @@ const ComplaintForm: React.FC = () => {
 
   const resetForm = () => {
     setTitle(''); setDescription(''); setAddress(''); setPinPosition(null);
-    setMediaFiles([]); setError(null); setRejectedReason(null); setStep(1);
+    setMediaFiles([]); setError(null); setRejectedReason(null); setSubmittedComplaintNo(null); setStep(1);
   };
 
   const handleSubmit = async () => {
@@ -214,15 +246,32 @@ const ComplaintForm: React.FC = () => {
 
       if (!response.ok) throw new Error(data.error || 'Submission failed.');
 
-      navigate('/dashboard', {
-        state: { complaintSubmitted: true, complaintNumber: data.complaint_number },
-      });
+      setSubmittedComplaintNo(data.complaint_number);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (submittedComplaintNo) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+          {/* Decorative backdrop */}
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-india-green-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-saffron-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="relative z-10">
+            <SuccessScreen 
+              trackingId={submittedComplaintNo} 
+              onGoDashboard={() => navigate('/dashboard', { state: { complaintSubmitted: true, complaintNumber: submittedComplaintNo } })} 
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (rejectedReason) {
     return (

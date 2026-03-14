@@ -1,7 +1,10 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY?.trim());
+console.log(`[AI] Initialized with API Key: ${process.env.GEMINI_API_KEY ? 'Present (' + process.env.GEMINI_API_KEY.trim().length + ' chars)' : 'MISSING'}`);
+
+// Primary and fallback models - Gemini 3 models appear to have available quota
+const MODELS = ['models/gemini-3-flash-preview', 'models/gemini-3-pro-preview', 'models/gemini-2.0-flash', 'models/gemini-flash-lite-latest'];
 
 
 /**
@@ -139,17 +142,43 @@ If rejecting, return:
 }
 `;
 
-    try {
-        const imageParts = images.map(img => ({
-            inlineData: {
-                data: img.base64,
-                mimeType: img.mimeType
-            }
-        }));
+    let lastError = null;
+    let responseText = null;
 
-        const result = await model.generateContent([prompt, ...imageParts]);
-        const response = await result.response;
-        const text = response.text();
+    for (const modelName of MODELS) {
+        try {
+            console.log(`[AI] Attempting classification with ${modelName}...`);
+            const currentModel = genAI.getGenerativeModel({ model: modelName });
+            
+            const imageParts = images.map(img => ({
+                inlineData: {
+                    data: img.base64,
+                    mimeType: img.mimeType
+                }
+            }));
+
+            const result = await currentModel.generateContent([prompt, ...imageParts]);
+            const response = await result.response;
+            responseText = response.text();
+            
+            if (responseText) {
+                console.log(`[AI] Successfully used ${modelName}`);
+                break;
+            }
+        } catch (err) {
+            console.warn(`[AI] Model ${modelName} failed: ${err.message}`);
+            lastError = err;
+            continue;
+        }
+    }
+
+    if (!responseText) {
+        console.error('[AI] All Gemini models failed.');
+        throw lastError || new Error('All Gemini models failed to respond.');
+    }
+
+    try {
+        const text = responseText;
 
         // Strip markdown code fences if present
         const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -174,7 +203,11 @@ If rejecting, return:
         return parsed;
 
     } catch (error) {
-        console.error('Gemini Validation Error:', error);
+        console.error('--- Gemini Validation Error ---');
+        console.error('Error Name:', error.name);
+        console.error('Error Message:', error.message);
+        if (error.stack) console.error('Stack Trace:', error.stack);
+        console.error('-------------------------------');
         throw error;
     }
 }

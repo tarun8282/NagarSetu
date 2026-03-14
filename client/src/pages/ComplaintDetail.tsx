@@ -12,7 +12,7 @@ import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
 import { format, parseISO, differenceInHours } from 'date-fns';
 
-// Fix leaflet default marker icons
+// Fix Leaflet's broken default icon paths in Vite builds
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -114,7 +114,7 @@ const ComplaintDetail: React.FC = () => {
 
                 const fullTimeline = [submissionEvent, ...timelineItems];
 
-                // If complain is resolved, reverse will put resolved at top, submitted at bottom
+                // If complaint is resolved, reverse will put resolved at top, submitted at bottom
                 setTimeline(fullTimeline.reverse());
             } catch (err: any) {
                 setError(err.message || 'Error loading details');
@@ -152,7 +152,7 @@ const ComplaintDetail: React.FC = () => {
     const hoursLeft = differenceInHours(deadline, referenceTime);
     const isOverdue = hoursLeft < 0;
     const isResolvedEarly = isResolved && !isOverdue;
-    
+
     const sm = statusMeta(complaint.status);
     const pm = PRIORITY_META[complaint.priority || 'medium'] || PRIORITY_META.medium;
     const evidenceMedia = complaint.media?.filter(m => !m.is_resolution_proof) || [];
@@ -489,9 +489,9 @@ const ComplaintDetail: React.FC = () => {
                                                     </span>
                                                     {t.new_status === 'resolved' && (
                                                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded ml-2"
-                                                            style={{ 
-                                                                color: isResolvedEarly ? '#138808' : '#ef4444', 
-                                                                backgroundColor: isResolvedEarly ? '#13880815' : '#ef444415' 
+                                                            style={{
+                                                                color: isResolvedEarly ? '#138808' : '#ef4444',
+                                                                backgroundColor: isResolvedEarly ? '#13880815' : '#ef444415'
                                                             }}>
                                                             {isResolvedEarly ? `✓ Completed ${hoursLeft}h Early` : `⚠ Missed SLA by ${Math.abs(hoursLeft)}h`}
                                                         </span>
@@ -585,7 +585,7 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
                 evForm.append('evidence', evidence);
                 evForm.append('uploaded_by', user?.id || '');
                 const evRes = await fetch(`/api/complaints/${complaintId}/evidence`, { method: 'POST', body: evForm });
-                
+
                 if (!evRes.ok) {
                     const errText = await evRes.text();
                     throw new Error(`Failed to upload evidence photo: ${errText}`);
