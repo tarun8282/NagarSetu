@@ -12,7 +12,8 @@ import {
     Calendar,
     ArrowUpDown,
     MapPin,
-    AlertCircle
+    X,
+    Shield
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format, parseISO, differenceInHours } from 'date-fns';
@@ -26,8 +27,10 @@ interface Complaint {
     status: string;
     created_at: string;
     sla_deadline: string;
+    resolved_at?: string;
     address: string;
     ward_number: string;
+    complaint_media?: { public_url: string }[];
 }
 
 const OfficerComplaints: React.FC = () => {
@@ -41,12 +44,10 @@ const OfficerComplaints: React.FC = () => {
     const fetchComplaints = async () => {
         try {
             setLoading(true);
-            // In a real app, RLS handles city/department isolation
             const { data, error } = await supabase
                 .from('complaints')
-                .select('*')
+                .select('*, complaint_media(public_url)')
                 .order('created_at', { ascending: false });
-
             if (error) throw error;
             setComplaints(data || []);
         } catch (err) {
@@ -56,187 +57,230 @@ const OfficerComplaints: React.FC = () => {
         }
     };
 
-    useEffect(() => {
-        fetchComplaints();
-    }, []);
+    useEffect(() => { fetchComplaints(); }, []);
 
     const filteredComplaints = useMemo(() => {
         return complaints.filter(c => {
-            const matchesSearch = c.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                 c.complaint_number.toLowerCase().includes(searchTerm.toLowerCase());
-            
-            const matchesStatus = statusFilter === 'all' ? true : 
-                                 statusFilter === 'sla_risk' ? (
-                                     c.status !== 'resolved' && 
-                                     differenceInHours(parseISO(c.sla_deadline), new Date()) < 24
-                                 ) : c.status === statusFilter;
-
-            const matchesPriority = priorityFilter === 'all' ? true : 
-                                   priorityFilter.split(',').includes(c.priority);
-
+            const matchesSearch = c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                c.complaint_number.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = statusFilter === 'all' ? true :
+                statusFilter === 'sla_risk' ? (
+                    c.status !== 'resolved' && differenceInHours(parseISO(c.sla_deadline), new Date()) < 24
+                ) : c.status === statusFilter;
+            const matchesPriority = priorityFilter === 'all' ? true :
+                priorityFilter.split(',').includes(c.priority);
             return matchesSearch && matchesStatus && matchesPriority;
         });
     }, [complaints, searchTerm, statusFilter, priorityFilter]);
 
     const getStatusStyle = (status: string) => {
         switch (status) {
-            case 'resolved': return 'bg-india-green-100 text-india-green-700 border-india-green-200';
-            case 'in_progress':
-            case 'under_review': return 'bg-navy-blue-100 text-navy-blue-700 border-navy-blue-200';
-            default: return 'bg-saffron-100 text-saffron-700 border-saffron-200';
+            case 'resolved':    return 'bg-emerald-50 text-emerald-700';
+            case 'in_progress': return 'bg-amber-50 text-amber-700';
+            case 'under_review':return 'bg-orange-50 text-orange-600';
+            case 'escalated':   return 'bg-red-50 text-red-600';
+            case 'rejected':    return 'bg-slate-100 text-slate-500';
+            default:            return 'bg-orange-50 text-orange-600';
         }
     };
 
-    const getPriorityStyle = (priority: string) => {
+    const getPriorityColor = (priority: string) => {
         switch (priority) {
-            case 'critical': return 'bg-red-600 text-white';
-            case 'high': return 'bg-saffron text-white';
-            case 'medium': return 'bg-amber-100 text-amber-700 border-amber-200';
-            default: return 'bg-slate-100 text-slate-600 border-slate-200';
+            case 'critical': return '#dc2626';
+            case 'high':     return '#FF9933';
+            case 'medium':   return '#f59e0b';
+            default:         return '#138808';
         }
     };
+
+    const activeFilterCount = [
+        statusFilter !== 'all',
+        priorityFilter !== 'all',
+        searchTerm !== '',
+    ].filter(Boolean).length;
 
     return (
-        <div className="space-y-8 pb-12 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-1">
-                    <Link to="/officer/dashboard" className="flex items-center gap-2 text-slate-500 hover:text-navy-blue transition-all font-bold group mb-2">
-                        <ArrowLeft className="group-hover:-translate-x-1 transition-transform" /> Dashboard
+        <div className="space-y-5 pb-12 max-w-5xl mx-auto">
+
+            {/* ── HEADER ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <Link to="/officer/dashboard"
+                        className="inline-flex items-center gap-1.5 text-slate-400 hover:text-[#FF9933] text-xs font-bold mb-2 transition-colors group">
+                        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" /> Dashboard
                     </Link>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white uppercase font-deva">Department Queue</h1>
-                    <p className="text-slate-500 font-medium">Manage and resolve assigned civic complaints.</p>
+                    <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white tracking-tight">Complaint Queue</h1>
+                    <p className="text-slate-400 text-sm mt-0.5">Manage and resolve assigned civic complaints</p>
                 </div>
 
-                <div className="flex items-center gap-2 bg-navy-blue text-white px-6 py-3 rounded-2xl shadow-lg">
-                    <Inbox className="w-5 h-5 text-saffron" />
-                    <div className="text-sm font-bold uppercase tracking-widest">
-                        {filteredComplaints.length} Complaints in View
-                    </div>
+                <div className="flex items-center gap-2 self-start sm:self-center px-4 py-2.5 rounded-xl text-sm font-bold"
+                    style={{ backgroundColor: '#FF993315', color: '#FF9933' }}>
+                    <Inbox className="w-4 h-4" />
+                    {filteredComplaints.length} in view
                 </div>
             </div>
 
-            {/* Filters & Search */}
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
-                <div className="grid md:grid-cols-12 gap-4">
-                    <div className="md:col-span-5 relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="Search by ID or Title..." 
-                            className="w-full pl-12 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border-none focus:ring-2 focus:ring-navy-blue transition-all font-medium"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    
-                    <div className="md:col-span-3 flex items-center gap-2">
-                        <Filter className="text-slate-400" size={18} />
-                        <select 
-                            className="w-full py-3 px-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border-none focus:ring-2 focus:ring-navy-blue transition-all font-bold text-sm"
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="under_review">Under Review</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="sla_risk">SLA Risk ( &lt;24h )</option>
-                        </select>
-                    </div>
+            {/* ── FILTERS ── */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-4 flex flex-wrap items-center gap-3">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[180px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                    <input
+                        type="text"
+                        placeholder="Search by ID or title..."
+                        className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                        style={{ '--tw-ring-color': '#FF9933' } as React.CSSProperties}
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
 
-                    <div className="md:col-span-3 flex items-center gap-2">
-                        <ArrowUpDown className="text-slate-400" size={18} />
-                        <select 
-                            className="w-full py-3 px-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border-none focus:ring-2 focus:ring-navy-blue transition-all font-bold text-sm"
-                            value={priorityFilter}
-                            onChange={(e) => setPriorityFilter(e.target.value)}
-                        >
-                            <option value="all">All Priorities</option>
-                            <option value="critical">Critical Only</option>
-                            <option value="high,critical">High & Critical</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
-                        </select>
-                    </div>
-
-                    <button 
-                        onClick={() => { setSearchTerm(''); setStatusFilter('all'); setPriorityFilter('all'); }}
-                        className="md:col-span-1 p-3 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-2xl text-slate-500 transition-colors"
-                        title="Clear Filters"
+                {/* Status */}
+                <div className="relative flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-slate-400" />
+                    <select
+                        className="appearance-none py-2 pl-3 pr-8 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 text-sm font-semibold focus:outline-none focus:ring-2 transition-all text-slate-600 dark:text-slate-300"
+                        value={statusFilter}
+                        onChange={e => setStatusFilter(e.target.value)}
                     >
-                        <AlertCircle size={20} />
-                    </button>
+                        <option value="all">All Statuses</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="sla_risk">SLA Risk (&lt;24h)</option>
+                    </select>
                 </div>
+
+                {/* Priority */}
+                <div className="relative flex items-center gap-2">
+                    <ArrowUpDown className="w-4 h-4 text-slate-400" />
+                    <select
+                        className="appearance-none py-2 pl-3 pr-8 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 text-sm font-semibold focus:outline-none focus:ring-2 transition-all text-slate-600 dark:text-slate-300"
+                        value={priorityFilter}
+                        onChange={e => setPriorityFilter(e.target.value)}
+                    >
+                        <option value="all">All Priorities</option>
+                        <option value="critical">Critical Only</option>
+                        <option value="high,critical">High & Critical</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+
+                {/* Clear */}
+                {activeFilterCount > 0 && (
+                    <button
+                        onClick={() => { setSearchTerm(''); setStatusFilter('all'); setPriorityFilter('all'); }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-500 text-xs font-bold transition-colors"
+                    >
+                        <X className="w-3.5 h-3.5" /> Clear ({activeFilterCount})
+                    </button>
+                )}
             </div>
 
-            {/* Complaints List */}
+            {/* ── COMPLAINT LIST ── */}
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <Loader className="w-10 h-10 animate-spin text-saffron" />
-                    <p className="font-deva font-medium animate-pulse">प्रतीक्षा करें... Fetching Queue</p>
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <Loader className="w-8 h-8 animate-spin text-[#FF9933]" />
+                    <p className="text-slate-400 text-sm animate-pulse">Loading complaints...</p>
                 </div>
             ) : filteredComplaints.length === 0 ? (
-                <div className="bg-slate-50 dark:bg-slate-900 rounded-[3rem] p-20 text-center border-2 border-dashed border-slate-200 dark:border-slate-800">
-                    <Inbox className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 uppercase">No Complaints Found</h3>
-                    <p className="text-slate-500">Try adjusting your search or filters to see more results.</p>
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
+                        <Inbox className="w-7 h-7 text-slate-300" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-700 dark:text-white mb-1">No Complaints Found</h3>
+                    <p className="text-slate-400 text-sm">Try adjusting your search or filters.</p>
                 </div>
             ) : (
-                <div className="grid gap-4">
+                <div className="space-y-2.5">
                     {filteredComplaints.map(c => {
                         const now = new Date();
                         const deadline = parseISO(c.sla_deadline);
                         const hoursLeft = differenceInHours(deadline, now);
                         const isRisk = hoursLeft < 24 && c.status !== 'resolved';
+                        const priorityColor = getPriorityColor(c.priority);
+                        
+                        const isResolved = c.status === 'resolved';
+                        const resolvedTime = isResolved && c.resolved_at ? parseISO(c.resolved_at) : now;
+                        const actualHoursLeft = differenceInHours(deadline, resolvedTime);
+                        const isResolvedEarly = isResolved && actualHoursLeft >= 0;
 
                         return (
-                            <Link 
-                                key={c.id} 
-                                to={`/complaint/${c.id}`} 
-                                className="group bg-white dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700 hover:border-navy-blue transition-all shadow-sm hover:shadow-xl flex items-center gap-6"
-                            >
-                                {/* Left Icon/Status */}
-                                <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 ${isRisk ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-400'}`}>
-                                    {isRisk ? <AlertTriangle /> : <Inbox />}
-                                    <div className="text-[8px] font-black uppercase mt-1">{isRisk ? 'Alert' : 'ID'}</div>
-                                </div>
+                            <Link key={c.id} to={`/complaint/${c.id}`}
+                                className={`group flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl border px-5 py-4 hover:shadow-md transition-all ${
+                                    isRisk ? 'border-red-200 bg-red-50/20' : 'border-slate-100 dark:border-slate-700 hover:border-[#FF9933]/30'
+                                }`}>
 
-                                {/* Content */}
-                                <div className="flex-1 min-w-0 space-y-1">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-[10px] font-mono font-black text-saffron-600 bg-saffron-50 px-2 py-0.5 rounded tracking-tighter uppercase whitespace-nowrap">
+                                {/* Image or Priority indicator */}
+                                {c.complaint_media && c.complaint_media.length > 0 ? (
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700">
+                                        <img src={c.complaint_media[0].public_url} alt="Evidence" className="w-full h-full object-cover" />
+                                    </div>
+                                ) : (
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                                        style={{ backgroundColor: priorityColor + '15' }}>
+                                        {isRisk
+                                            ? <AlertTriangle className="w-5 h-5 text-red-500" />
+                                            : <Shield className="w-5 h-5" style={{ color: priorityColor }} />
+                                        }
+                                    </div>
+                                )}
+
+                                {/* Main content */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                        <span className="text-[10px] font-mono font-bold text-[#FF9933]">
                                             {c.complaint_number}
                                         </span>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ${getStatusStyle(c.status)} whitespace-nowrap`}>
+                                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getStatusStyle(c.status)}`}>
                                             {c.status.replace(/_/g, ' ')}
                                         </span>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${getPriorityStyle(c.priority)} whitespace-nowrap`}>
+                                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded"
+                                            style={{ backgroundColor: priorityColor + '15', color: priorityColor }}>
                                             {c.priority}
                                         </span>
                                     </div>
-                                    <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase truncate font-deva group-hover:text-navy-blue transition-colors">
-                                        {c.title}
-                                    </h2>
-                                    <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs font-bold text-slate-500">
-                                        <span className="flex items-center gap-1"><MapPin size={12} className="text-navy-blue" /> Ward {c.ward_number || '45'}</span>
-                                        <span className="flex items-center gap-1"><Calendar size={12} /> {format(parseISO(c.created_at), 'dd MMM yyyy')}</span>
-                                        <span className={`flex items-center gap-1 ${isRisk ? 'text-red-600' : 'text-slate-400'}`}>
-                                            <Clock size={12} /> SLA: {format(deadline, 'dd MMM')}
+                                    <p className="font-semibold text-slate-800 dark:text-white text-sm truncate group-hover:text-[#FF9933] transition-colors capitalize">
+                                        {c.title.toLowerCase()}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[11px] text-slate-400">
+                                        <span className="flex items-center gap-1">
+                                            <MapPin className="w-3 h-3" /> Ward {c.ward_number || 'N/A'}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <Calendar className="w-3 h-3" /> {format(parseISO(c.created_at), 'dd MMM yyyy')}
+                                        </span>
+                                        <span className={`flex items-center gap-1 ${isRisk ? 'text-red-500 font-semibold' : ''}`}>
+                                            <Clock className="w-3 h-3" /> SLA: {format(deadline, 'dd MMM')}
                                         </span>
                                     </div>
                                 </div>
 
-                                {/* Right Action */}
-                                <div className="hidden md:flex items-center gap-4 pl-4 border-l border-slate-100 dark:border-slate-700">
+                                {/* SLA time + arrow */}
+                                <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-slate-100 dark:border-slate-700 shrink-0">
                                     <div className="text-right">
-                                        <div className={`text-lg font-black ${hoursLeft < 0 ? 'text-red-600' : hoursLeft < 24 ? 'text-amber-600' : 'text-slate-900 dark:text-white'}`}>
-                                            {hoursLeft < 0 ? 'BREACH' : `${hoursLeft}h`}
-                                        </div>
-                                        <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">Remaining</div>
+                                        {isResolved ? (
+                                            <>
+                                                <div className={`text-base font-black ${isResolvedEarly ? 'text-[#138808]' : 'text-red-500'}`}>
+                                                    {isResolvedEarly ? `+${actualHoursLeft}h` : `−${Math.abs(actualHoursLeft)}h`}
+                                                </div>
+                                                <div className={`text-[9px] font-semibold uppercase tracking-widest ${isResolvedEarly ? 'text-[#138808]' : 'text-red-500'}`}>
+                                                    {isResolvedEarly ? 'early' : 'late'}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className={`text-base font-black ${hoursLeft < 0 ? 'text-red-600' : hoursLeft < 24 ? 'text-amber-600' : 'text-slate-600 dark:text-slate-300'}`}>
+                                                    {hoursLeft < 0 ? `−${Math.abs(hoursLeft)}h` : `${hoursLeft}h`}
+                                                </div>
+                                                <div className="text-[9px] font-semibold uppercase tracking-widest text-slate-400">remaining</div>
+                                            </>
+                                        )}
                                     </div>
-                                    <div className="p-3 rounded-full bg-navy-blue-50 text-navy-blue group-hover:bg-navy-blue group-hover:text-white transition-all">
-                                        <ChevronRight size={20} />
+                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                                        style={{ backgroundColor: '#FF993315', color: '#FF9933' }}>
+                                        <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                                     </div>
                                 </div>
                             </Link>

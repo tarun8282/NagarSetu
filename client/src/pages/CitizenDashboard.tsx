@@ -9,6 +9,9 @@ interface Complaint {
     title: string;
     status: string;
     created_at: string;
+    sla_deadline: string;
+    resolved_at?: string;
+    complaint_media?: { public_url: string }[];
 }
 
 const CitizenDashboard: React.FC = () => {
@@ -125,24 +128,63 @@ const CitizenDashboard: React.FC = () => {
                     </div>
                 ) : (
                     <div className="grid gap-4">
-                        {complaints.map((c) => (
-                            <Link key={c.id} to={`/complaint/${c.id}`} className="group p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-navy-blue-400 dark:hover:border-navy-blue-500 transition-all shadow-sm block">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div className="space-y-1">
-                                        <div className="text-xs font-mono font-bold text-saffron-600 uppercase tracking-tighter">{c.complaint_number}</div>
-                                        <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-navy-blue-600 transition-colors uppercase">{c.title}</h3>
-                                        <div className="text-sm text-slate-500 flex items-center gap-4">
-                                            <span>Filed on {new Date(c.created_at).toLocaleDateString()}</span>
-                                            <span>•</span>
-                                            <span>Ward 45</span>
+                        {complaints.map((c) => {
+                            const now = new Date();
+                            const isResolved = c.status === 'resolved';
+                            const deadline = new Date(c.sla_deadline);
+                            const referenceTime = isResolved && c.resolved_at ? new Date(c.resolved_at) : now;
+                            
+                            // calculating difference in hours
+                            const msPerHour = 1000 * 60 * 60;
+                            const hoursLeft = Math.floor((deadline.getTime() - referenceTime.getTime()) / msPerHour);
+                            
+                            const actualHoursLeft = hoursLeft;
+                            const isResolvedEarly = isResolved && actualHoursLeft >= 0;
+
+                            return (
+                                <Link key={c.id} to={`/complaint/${c.id}`} className="group p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-navy-blue-400 dark:hover:border-navy-blue-500 transition-all shadow-sm block">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            {c.complaint_media && c.complaint_media.length > 0 && (
+                                                <div className="hidden sm:block w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-100 dark:border-slate-700">
+                                                    <img src={c.complaint_media[0].public_url} alt="Complaint Media" className="w-full h-full object-cover" />
+                                                </div>
+                                            )}
+                                            <div className="space-y-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="text-xs font-mono font-bold text-saffron-600 uppercase tracking-tighter">{c.complaint_number}</div>
+                                                    <div className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase", getStatusStyle(c.status))}>
+                                                        {c.status.replace(/_/g, ' ')}
+                                                    </div>
+                                                </div>
+                                                <h3 className="font-bold text-slate-900 dark:text-white group-hover:text-navy-blue-600 transition-colors uppercase">{c.title}</h3>
+                                                <div className="text-sm text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-1">
+                                                    <span>Filed on {new Date(c.created_at).toLocaleDateString()}</span>
+                                                    <span className="hidden sm:inline">•</span>
+                                                    <span>Ward 45</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="hidden md:flex items-center gap-4 text-right shrink-0">
+                                            {isResolved ? (
+                                                <div className="flex flex-col items-end">
+                                                    <div className={`text-sm font-black ${isResolvedEarly ? 'text-india-green-600' : 'text-red-500'}`}>
+                                                        {isResolvedEarly ? `✓ Solved ${actualHoursLeft}h Early` : `⚠ Missed SLA by ${Math.abs(actualHoursLeft)}h`}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-end">
+                                                    <div className={`text-base font-black ${hoursLeft < 0 ? 'text-red-600' : hoursLeft < 24 ? 'text-amber-600' : 'text-slate-600'}`}>
+                                                        {hoursLeft < 0 ? `−${Math.abs(hoursLeft)}h` : `${hoursLeft}h`}
+                                                    </div>
+                                                    <div className="text-[9px] font-semibold uppercase tracking-widest text-slate-400">remaining</div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                    <div className={cn("px-4 py-1.5 rounded-full text-xs font-bold border capitalize", getStatusStyle(c.status))}>
-                                        {c.status.replace(/_/g, ' ')}
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
+                                </Link>
+                            );
+                        })}
                     </div>
                 )}
             </div>
