@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Filter, Clock, CheckCircle2, AlertCircle, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import useSocket from '../hooks/useSocket';
 
 interface Complaint {
     id: string;
@@ -19,29 +20,38 @@ const CitizenDashboard: React.FC = () => {
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [liveUpdate, setLiveUpdate] = useState(false);
 
-    useEffect(() => {
-        const fetchComplaints = async () => {
-            try {
-                if (!user?.id) return;
-                
-                const response = await fetch(`/api/complaints?citizen_id=${user.id}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    setComplaints(data.complaints || []);
-                } else {
-                    setError(data.error || 'Failed to fetch complaints');
-                }
-            } catch (err: any) {
-                setError(err.message || 'Error fetching complaints');
-            } finally {
-                setLoading(false);
+    const fetchComplaints = useCallback(async () => {
+        try {
+            if (!user?.id) return;
+            const response = await fetch(`/api/complaints?citizen_id=${user.id}`);
+            const data = await response.json();
+            if (data.success) {
+                setComplaints(data.complaints || []);
+            } else {
+                setError(data.error || 'Failed to fetch complaints');
             }
-        };
-
-        fetchComplaints();
+        } catch (err: any) {
+            setError(err.message || 'Error fetching complaints');
+        } finally {
+            setLoading(false);
+        }
     }, [user?.id]);
+
+    useEffect(() => { fetchComplaints(); }, [fetchComplaints]);
+
+    // 🔌 Real-time updates via Socket.IO
+    useSocket({
+        room: user?.id ? `citizen:${user.id}` : undefined,
+        events: {
+            'complaint:change': () => {
+                setLiveUpdate(true);
+                fetchComplaints();
+                setTimeout(() => setLiveUpdate(false), 3000);
+            },
+        },
+    });
 
     const calculateStats = () => {
         const total = complaints.length;
@@ -68,6 +78,13 @@ const CitizenDashboard: React.FC = () => {
         <div className="space-y-10">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-800 p-8 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
+                {/* Live update pulse dot */}
+                {liveUpdate && (
+                    <span className="absolute top-3 right-3 flex items-center gap-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Live update
+                    </span>
+                )}
                 <div className="absolute right-0 top-0 opacity-10 dark:opacity-5 text-slate-900 dark:text-white pointer-events-none">
                     <svg width="150" height="150" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" />

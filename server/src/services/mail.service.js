@@ -74,12 +74,12 @@ function initializeTransporter() {
       throw new Error(`Unknown email provider: ${provider}`);
   }
 
-  // Verify transporter
-  transporter.verify((error, success) => {
+  // Verify transporter (non-blocking — SMTP may be unavailable on dev networks)
+  transporter.verify((error) => {
     if (error) {
-      console.error('[Mail Service] Error:', error);
+      console.warn(`[Mail Service] ⚠️  SMTP not reachable (${error.code || error.message}) — emails will fail until fixed. Server continues normally.`);
     } else {
-      console.log('[Mail Service] Ready to send emails');
+      console.log('[Mail Service] ✅ Ready to send emails');
     }
   });
 }

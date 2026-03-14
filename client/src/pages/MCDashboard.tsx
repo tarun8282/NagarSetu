@@ -12,6 +12,7 @@ import { fetchMCDashboard, MCDepartment, MCComplaint } from '../api/mc';
 import { format, differenceInHours, parseISO, isToday } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import RaiseAlertModal from '../components/alerts/RaiseAlertModal';
+import useSocket from '../hooks/useSocket';
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 const PRIORITY_COLOR: Record<string, string> = {
@@ -73,6 +74,19 @@ const MCDashboard: React.FC = () => {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // 🔌 Real-time via Socket.IO — join city room, refresh on any complaint change
+    const [liveUpdate, setLiveUpdate] = useState(false);
+    useSocket({
+        room: cityId ? `city:${cityId}` : undefined,
+        events: {
+            'complaint:change': () => {
+                setLiveUpdate(true);
+                loadData();
+                setTimeout(() => setLiveUpdate(false), 3000);
+            },
+        },
+    });
 
     /* City-wide stats */
     const cityStats = useMemo(() => {

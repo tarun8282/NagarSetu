@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
     Clock, 
@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { format, isToday, differenceInHours, parseISO } from 'date-fns';
+import useSocket from '../hooks/useSocket';
 
 interface Complaint {
     id: string;
@@ -44,8 +45,9 @@ const DepartmentDashboard: React.FC = () => {
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [liveUpdate, setLiveUpdate] = useState(false);
 
-    const fetchComplaints = async () => {
+    const fetchComplaints = useCallback(async () => {
         try {
             const { data, error: fetchError } = await supabase
                 .from('complaints')
@@ -59,16 +61,21 @@ const DepartmentDashboard: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchComplaints();
-        const subscription = supabase
-            .channel('officer_dashboard_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, () => fetchComplaints())
-            .subscribe();
-        return () => { subscription.unsubscribe(); };
     }, []);
+
+    useEffect(() => { fetchComplaints(); }, [fetchComplaints]);
+
+    // 🔌 Real-time via Socket.IO (city room)
+    useSocket({
+        room: user?.city_id ? `city:${user.city_id}` : undefined,
+        events: {
+            'complaint:change': () => {
+                setLiveUpdate(true);
+                fetchComplaints();
+                setTimeout(() => setLiveUpdate(false), 3000);
+            },
+        },
+    });
 
     // ── Computed Stats ──
     const stats = useMemo(() => {

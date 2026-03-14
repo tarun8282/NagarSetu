@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
     LayoutDashboard, 
     MapPin, 
@@ -19,16 +19,33 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import RaiseAlertModal from '../components/alerts/RaiseAlertModal';
+import useSocket from '../hooks/useSocket';
 
 const StateDashboard: React.FC = () => {
     const { user } = useAuth();
-    const [isAlertModalOpen, setIsAlertModalOpen] = React.useState(false);
-    const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+    const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [liveUpdate, setLiveUpdate] = useState(false);
 
-    const handleAlertSuccess = (msg: string) => {
+    const handleAlertSuccess = useCallback((msg: string) => {
         setSuccessMessage(msg);
         setTimeout(() => setSuccessMessage(null), 5000);
-    };
+    }, []);
+
+    // 🔌 Real-time via Socket.IO — join state room
+    useSocket({
+        room: user?.state_id ? `state:${user.state_id}` : undefined,
+        events: {
+            'complaint:change': () => {
+                setLiveUpdate(true);
+                setTimeout(() => setLiveUpdate(false), 3000);
+            },
+            'alert:new': () => {
+                setLiveUpdate(true);
+                setTimeout(() => setLiveUpdate(false), 3000);
+            },
+        },
+    });
     
     // Mock data for State Overview
     const stats = [
@@ -70,6 +87,12 @@ const StateDashboard: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-3">
+                    {liveUpdate && (
+                        <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-100">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Live update
+                        </span>
+                    )}
                     <button 
                         onClick={() => setIsAlertModalOpen(true)}
                         className="flex items-center gap-2 px-5 py-2.5 bg-saffron text-white rounded-xl font-bold hover:bg-saffron-600 transition-all shadow-lg shadow-saffron-200 dark:shadow-none text-sm"
@@ -77,6 +100,7 @@ const StateDashboard: React.FC = () => {
                         <Megaphone size={18} /> Broadcast Alert
                     </button>
                 </div>
+
             </div>
 
             {/* Quick Stats Grid */}
