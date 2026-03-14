@@ -119,6 +119,18 @@ Then append the correct department division based on category:
 Example: A pothole in Mumbai → "BMC - Public Works Department"
 Example: Water leak in Pune → "PMC - Water Supply Department"
 
+--- SLA POLICY (Resolution Time Limits) ---
+Use the following SLA times to inform your severity rating. Issues with shorter SLAs
+that are critical should always be rated HIGH or CRITICAL:
+- Electricity Outage / Streetlight: 6 hours  ← MOST URGENT
+- Garbage Overflow / Collection:   12 hours
+- Water Issues (leak, shortage):   24 hours
+- Road Potholes / Road Damage:     48 hours
+- Illegal Construction / Permit:   72 hours ← LEAST URGENT
+
+If the issue is electricity-related and an entire area has no power, always rate it CRITICAL.
+If garbage has been uncollected for 3+ days and SLA is 12h, rate it HIGH.
+
 Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {
   "is_valid": true,

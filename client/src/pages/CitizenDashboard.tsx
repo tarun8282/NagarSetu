@@ -24,10 +24,10 @@ const CitizenDashboard: React.FC = () => {
         const fetchComplaints = async () => {
             try {
                 if (!user?.id) return;
-                
+
                 const response = await fetch(`/api/complaints?citizen_id=${user.id}`);
                 const data = await response.json();
-                
+
                 if (data.success) {
                     setComplaints(data.complaints || []);
                 } else {
@@ -72,7 +72,7 @@ const CitizenDashboard: React.FC = () => {
                     <svg width="150" height="150" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" />
                         {[...Array(24)].map((_, i) => (
-                          <line key={i} x1="50" y1="50" x2="50" y2="5" stroke="currentColor" strokeWidth="1" transform={`rotate(${i * 15} 50 50)`} />
+                            <line key={i} x1="50" y1="50" x2="50" y2="5" stroke="currentColor" strokeWidth="1" transform={`rotate(${i * 15} 50 50)`} />
                         ))}
                     </svg>
                 </div>
@@ -133,11 +133,11 @@ const CitizenDashboard: React.FC = () => {
                             const isResolved = c.status === 'resolved';
                             const deadline = new Date(c.sla_deadline);
                             const referenceTime = isResolved && c.resolved_at ? new Date(c.resolved_at) : now;
-                            
+
                             // calculating difference in hours
                             const msPerHour = 1000 * 60 * 60;
                             const hoursLeft = Math.floor((deadline.getTime() - referenceTime.getTime()) / msPerHour);
-                            
+
                             const actualHoursLeft = hoursLeft;
                             const isResolvedEarly = isResolved && actualHoursLeft >= 0;
 

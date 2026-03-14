@@ -257,11 +257,10 @@ const MCDashboard: React.FC = () => {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: idx * 0.04 }}
                                         onClick={() => { setSelectedDept(dept); setSearchTerm(''); setStatusFilter('all'); }}
-                                        className={`text-left rounded-xl border-2 p-5 hover:shadow-lg transition-all group hover:-translate-y-0.5 ${
-                                            hasRisk || hasCritical
+                                        className={`text-left rounded-xl border-2 p-5 hover:shadow-lg transition-all group hover:-translate-y-0.5 ${hasRisk || hasCritical
                                                 ? 'border-red-100 dark:border-red-900/40 bg-red-50/30 dark:bg-red-950/10 hover:border-red-300'
                                                 : 'border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-[#FF9933]/40'
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl shrink-0"
@@ -515,9 +514,8 @@ const MCDashboard: React.FC = () => {
                                         <Link
                                             key={c.id}
                                             to={`/complaint/${c.id}`}
-                                            className={`group flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl border px-5 py-4 hover:shadow-md transition-all ${
-                                                isOverdue ? 'border-red-200 bg-red-50/20' : 'border-slate-100 dark:border-slate-700 hover:border-[#FF9933]/30'
-                                            }`}
+                                            className={`group flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl border px-5 py-4 hover:shadow-md transition-all ${isOverdue ? 'border-red-200 bg-red-50/20' : 'border-slate-100 dark:border-slate-700 hover:border-[#FF9933]/30'
+                                                }`}
                                         >
                                             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                                                 style={{ backgroundColor: pColor + '15' }}>

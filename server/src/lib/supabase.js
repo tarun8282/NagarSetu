@@ -9,7 +9,19 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.error('Missing Supabase Server environment variables');
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false
+  },
+  global: {
+    headers: {
+      // Explicitly set Authorization so RLS is fully bypassed (service_role bypasses all policies)
+      Authorization: `Bearer ${supabaseServiceKey}`
+    }
+  }
+});
 
 module.exports = { supabase };
 

@@ -1,65 +1,26 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import React, { useEffect, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
-import { Info, Loader, AlertCircle, LocateFixed } from 'lucide-react';
+import { Info, Loader, AlertCircle, LocateFixed, Flame, Map, Filter } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import AdminHeatmapView from './AdminHeatmapView';
 
-// Component to handle auto-bounds and fly-to
-const MapController = ({ userLocation, recenterTrigger, complaints }: { 
-    userLocation: [number, number] | null, 
-    recenterTrigger: number,
-    complaints: Complaint[]
-}) => {
-    const map = useMap();
-
-    // Auto-fit bounds when complaints load
-    useEffect(() => {
-        if (complaints.length > 0) {
-            const bounds = L.latLngBounds(complaints.map(c => [c.latitude, c.longitude]));
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+/* ─── Type Augmentation for leaflet.heat ───────────────────── */
+declare module 'leaflet' {
+    function heatLayer(
+        latlngs: Array<[number, number, number?]>,
+        options?: {
+            minOpacity?: number;
+            maxZoom?: number;
+            max?: number;
+            radius?: number;
+            blur?: number;
+            gradient?: Record<string, string>;
         }
-    }, [complaints, map]);
-
-    // Fly to user location
-    useEffect(() => {
-        if (userLocation) {
-            map.flyTo(userLocation, 14, { duration: 1.5 });
-        }
-    }, [userLocation, map, recenterTrigger]);
-
-    return null;
-};
-
-// Actual Heatmap Layer using leaflet.heat
-const HeatLayer = ({ points }: { points: [number, number, number][] }) => {
-    const map = useMap();
-
-    useEffect(() => {
-        if (!points || points.length === 0) return;
-
-        // @ts-ignore - L.heatLayer is added by 'leaflet.heat'
-        const heat = L.heatLayer(points, {
-            radius: 25,
-            blur: 15,
-            maxZoom: 17,
-            gradient: {
-                0.4: 'blue',
-                0.6: 'cyan',
-                0.8: 'lime',
-                0.9: 'yellow',
-                1.0: 'red'
-            }
-        }).addTo(map);
-
-        return () => {
-            map.removeLayer(heat);
-        };
-    }, [points, map]);
-
-    return null;
-};
+    ): L.Layer & { setLatLngs: (points: Array<[number, number, number?]>) => void };
+}
 
 interface Complaint {
     id: string;
@@ -73,219 +34,324 @@ interface Complaint {
     priority?: string;
 }
 
+const PRIORITY_WEIGHT: Record<string, number> = {
+    critical: 1.0,
+    high: 0.75,
+    medium: 0.5,
+    low: 0.25,
+};
+
+/* ─── Auto-fit bounds when complaints load ───────────────────── */
+const MapController: React.FC<{
+    complaints: Complaint[];
+    userLocation: [number, number] | null;
+    recenterTrigger: number;
+}> = ({ complaints, userLocation, recenterTrigger }) => {
+    const map = useMap();
+
+    useEffect(() => {
+        if (complaints.length === 0) return;
+        const bounds = L.latLngBounds(complaints.map(c => [c.latitude, c.longitude]));
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    }, [complaints, map]);
+
+    useEffect(() => {
+        if (userLocation) map.flyTo(userLocation, 14, { duration: 1.5 });
+    }, [userLocation, recenterTrigger, map]);
+
+    return null;
+};
+
+/* ─── Heat Layer Component ───────────────────────────────────── */
+const HeatLayer: React.FC<{ points: Array<[number, number, number]> }> = ({ points }) => {
+    const map = useMap();
+    const layerRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (!map) return;
+        if (layerRef.current) map.removeLayer(layerRef.current);
+        if (points.length === 0) return;
+
+        const heat = (L as any).heatLayer(points, {
+            radius: 35,
+            blur: 25,
+            maxZoom: 17,
+            minOpacity: 0.4,
+            gradient: {
+                0.0: '#313695',
+                0.2: '#4575b4',
+                0.35: '#74add1',
+                0.5: '#fee090',
+                0.65: '#f46d43',
+                0.8: '#d73027',
+                1.0: '#a50026',
+            },
+        });
+
+        heat.addTo(map);
+        layerRef.current = heat;
+
+        return () => { if (layerRef.current) map.removeLayer(layerRef.current); };
+    }, [map, points]);
+
+    return null;
+};
+
+/* ─── Marker icons ───────────────────────────────────────────── */
 const createIcon = (priority: string) => {
-    const colors: { [key: string]: string } = {
-        'high': '#ef4444',
-        'critical': '#991b1b',
-        'medium': '#f97316',
-        'low': '#22c55e',
-        'urgent': '#dc2626'
+    const colors: Record<string, string> = {
+        critical: '#991b1b',
+        high: '#ef4444',
+        medium: '#f97316',
+        low: '#22c55e',
     };
     const color = colors[priority?.toLowerCase()] || '#64748b';
     return L.divIcon({
-        html: `<div style="background: ${color}; border: 3px solid white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
-        iconSize: [24, 24],
-        className: 'custom-marker'
+        html: `<div style="background:${color};border:3px solid white;border-radius:50%;width:22px;height:22px;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [22, 22],
+        className: 'custom-marker',
     });
 };
 
-const createUserIcon = () => {
-    return L.divIcon({
-        html: `<div style="background: #2563eb; border: 2px solid white; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.3), 0 2px 8px rgba(0,0,0,0.3);"></div>`,
-        iconSize: [14, 14],
-        className: 'user-marker'
-    });
-};
+const createUserIcon = () => L.divIcon({
+    html: `<div style="background:#2563eb;border:2px solid white;border-radius:50%;width:14px;height:14px;box-shadow:0 0 0 4px rgba(37,99,235,0.3),0 2px 8px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [14, 14],
+    className: 'user-marker',
+});
 
-const HeatmapView: React.FC = () => {
-    const { user } = useAuth();
-    const defaultPosition: [number, number] = [19.0760, 72.8777]; // Mumbai
-    const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-    const [recenterTrigger, setRecenterTrigger] = useState(0);
+/* ─── Citizen Thermal Heatmap ────────────────────────────────── */
+const CitizenHeatmap: React.FC = () => {
+    const defaultCenter: [number, number] = [19.076, 72.8777];
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [filterPriority, setFilterPriority] = useState<string>('all');
+    const [filterStatus, setFilterStatus] = useState<string>('all');
     const [showMarkers, setShowMarkers] = useState(true);
+    const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+    const [recenterTrigger, setRecenterTrigger] = useState(0);
 
     useEffect(() => {
         const fetchComplaints = async () => {
             try {
-                const cityId = user?.city_id || '';
-                const response = await fetch(`/api/complaints?city_id=${cityId}`);
+                const response = await fetch('/api/complaints/heatmap');
                 const data = await response.json();
                 if (data.success) {
-                    // Robust coordinate validation and parsing
-                    const validComplaints = (data.complaints || []).filter((c: any) => {
-                        const lat = parseFloat(c.latitude);
-                        const lng = parseFloat(c.longitude);
-                        // Be more permissive: as long as it's a valid number and not exactly 0
-                        return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-                    }).map((c: any) => ({
-                        ...c,
-                        latitude: parseFloat(c.latitude),
-                        longitude: parseFloat(c.longitude)
-                    }));
-                    
-                    console.log('Heatmap Data Diagnostics:', {
-                        totalReceived: data.complaints?.length,
-                        validFound: validComplaints.length,
-                        sample: validComplaints.slice(0, 2)
-                    });
-                    
-                    setComplaints(validComplaints);
+                    setComplaints(data.complaints || []);
                 } else {
                     setError(data.error || 'Failed to fetch complaints');
                 }
             } catch (err: any) {
-                setError(err.message || 'Error connecting to API');
+                setError('Could not reach server. Is the backend running?');
             } finally {
                 setLoading(false);
             }
         };
-
         fetchComplaints();
 
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
-                (err) => console.log("Location Error:", err)
-            );
-        }
-    }, [user?.city_id]);
+        navigator.geolocation?.getCurrentPosition(
+            pos => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+            () => { }
+        );
+    }, []);
 
-    const filteredComplaints = useMemo(() => {
-        if (filterPriority === 'all') return complaints;
-        return complaints.filter(c => (c.priority || 'medium').toLowerCase() === filterPriority.toLowerCase());
-    }, [complaints, filterPriority]);
+    const filteredComplaints = complaints.filter(c => {
+        const matchPriority = filterPriority === 'all' || (c.priority || 'medium').toLowerCase() === filterPriority;
+        const matchStatus = filterStatus === 'all' || c.status === filterStatus;
+        return matchPriority && matchStatus;
+    });
 
-    const heatPoints = useMemo(() => {
-        const intensityMap: Record<string, number> = { 'critical': 1.0, 'high': 0.8, 'medium': 0.5, 'low': 0.3 };
-        return filteredComplaints.map(c => {
-            const intensity = intensityMap[(c.priority || 'medium').toLowerCase()] || 0.5;
-            return [c.latitude, c.longitude, intensity] as [number, number, number];
-        });
-    }, [filteredComplaints]);
+    const heatPoints: Array<[number, number, number]> = filteredComplaints.map(c => [
+        c.latitude,
+        c.longitude,
+        PRIORITY_WEIGHT[(c.priority || 'medium').toLowerCase()] ?? 0.5,
+    ]);
 
-    const getPriorityColor = (priority?: string) => {
-        const colors: { [key: string]: string } = { 'high': 'bg-red-500', 'critical': 'bg-red-900', 'medium': 'bg-orange-500', 'low': 'bg-green-500', 'urgent': 'bg-red-600' };
-        return colors[priority?.toLowerCase() || ''] || 'bg-slate-500';
+    const counts = {
+        critical: complaints.filter(c => (c.priority || '').toLowerCase() === 'critical').length,
+        high: complaints.filter(c => (c.priority || '').toLowerCase() === 'high').length,
+        medium: complaints.filter(c => (c.priority || '').toLowerCase() === 'medium').length,
+        low: complaints.filter(c => (c.priority || '').toLowerCase() === 'low').length,
     };
 
-    const getStatusColor = (status: string) => {
-        if (status === 'resolved') return 'text-green-600';
-        if (['in_progress', 'under_review'].includes(status)) return 'text-blue-600';
-        return 'text-orange-600';
+    const getPriorityBg = (priority?: string) => {
+        const map: Record<string, string> = { critical: 'bg-red-900', high: 'bg-red-500', medium: 'bg-orange-500', low: 'bg-green-500' };
+        return map[priority?.toLowerCase() || ''] || 'bg-slate-500';
     };
 
     return (
-        <div className="h-[calc(100vh-140px)] rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 shadow-2xl relative bg-slate-100 dark:bg-slate-900">
-            {error && (
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-300">
-                    <AlertCircle size={20} /> {error}
+        <div className="space-y-0">
+            {/* ── Header row ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <h1 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center gap-2">
+                        <Flame className="w-5 h-5 text-[#FF9933]" /> Complaint Heatmap
+                    </h1>
+                    <p className="text-xs text-slate-400 mt-0.5">Visualise complaint density across all wards in real time</p>
                 </div>
-            )}
-
-            {loading && (
-                <div className="absolute inset-0 flex items-center justify-center z-[1000] bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
-                    <div className="text-center space-y-4">
-                        <Loader className="animate-spin h-10 w-10 text-saffron-600 mx-auto" />
-                        <p className="text-slate-600 dark:text-slate-400 font-semibold">Loading data...</p>
-                    </div>
+                <div className="flex gap-2 flex-wrap">
+                    {[
+                        { label: 'Critical', count: counts.critical, color: '#a50026' },
+                        { label: 'High', count: counts.high, color: '#d73027' },
+                        { label: 'Medium', count: counts.medium, color: '#f46d43' },
+                        { label: 'Low', count: counts.low, color: '#4575b4' },
+                    ].map(({ label, count, color }) => (
+                        <div key={label} className="px-3 py-1.5 rounded-lg text-center border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+                            <div className="text-sm font-black" style={{ color }}>{count}</div>
+                            <div className="text-[9px] font-bold text-slate-400 uppercase">{label}</div>
+                        </div>
+                    ))}
                 </div>
-            )}
+            </div>
 
-            {/* Float Controls */}
-            <div className="absolute top-6 right-6 z-[1000] flex flex-col gap-2">
-                 <button 
-                    onClick={() => setShowMarkers(!showMarkers)}
-                    className="px-4 py-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold shadow-lg transition-all active:scale-95"
-                >
+            {/* ── Filter bar ── */}
+            <div className="flex flex-wrap items-center gap-3 mb-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filters:</span>
+                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
+                    className="text-sm font-semibold px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#FF9933]/30">
+                    <option value="all">All Priorities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                    className="text-sm font-semibold px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#FF9933]/30">
+                    <option value="all">All Statuses</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="under_review">Under Review</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="escalated">Escalated</option>
+                </select>
+                <button
+                    onClick={() => setShowMarkers(v => !v)}
+                    className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-[#FF9933]/50 transition-colors">
                     {showMarkers ? 'Hide Markers' : 'Show Markers'}
                 </button>
+                <span className="ml-auto text-xs text-slate-400 font-medium">{heatPoints.length} of {complaints.length} points shown</span>
             </div>
 
-            <div className="absolute bottom-6 left-6 z-[1000] flex flex-col gap-2">
-                {userLocation && (
-                    <button 
-                        onClick={() => setRecenterTrigger(t => t + 1)}
-                        className="p-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 transition-all active:scale-95"
-                    >
-                        <LocateFixed size={24} className="text-slate-700 dark:text-slate-300" />
-                    </button>
-                )}
-            </div>
+            {/* ── Map container ── */}
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-xl"
+                style={{ height: 'calc(100vh - 260px)', minHeight: '440px' }}>
 
-            <div className="absolute bottom-6 right-6 z-[1000] space-y-3 min-w-[220px]">
-                <div className="p-4 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md rounded-lg border border-slate-200 dark:border-slate-800 shadow-lg space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block">Priority Filter</label>
-                        <select
-                            value={filterPriority}
-                            onChange={(e) => setFilterPriority(e.target.value)}
-                            className="w-full px-3 py-2 text-sm font-bold bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 outline-none"
-                        >
-                            <option value="all">All ({complaints.length})</option>
-                            {['Critical', 'High', 'Medium', 'Low'].map(p => (
-                                <option key={p} value={p.toLowerCase()}>{p} ({complaints.filter(c => (c.priority || 'medium').toLowerCase() === p.toLowerCase()).length})</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Intensity Scale</div>
-                        <div className="space-y-2">
-                            {[['Critical', 'bg-red-900'], ['High', 'bg-red-500'], ['Medium', 'bg-orange-500'], ['Low', 'bg-green-500']].map(([label, color]) => (
-                                <div key={label} className="flex items-center gap-3">
-                                    <div className={`w-3 h-3 rounded-full ${color}`}></div>
-                                    <span className="text-xs font-semibold dark:text-slate-300">{label}</span>
-                                </div>
-                            ))}
+                {loading && (
+                    <div className="absolute inset-0 flex items-center justify-center z-[1000] bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm">
+                        <div className="text-center space-y-3">
+                            <Loader className="animate-spin h-10 w-10 text-[#FF9933] mx-auto" />
+                            <p className="text-slate-500 font-semibold text-sm">Loading heatmap data…</p>
                         </div>
                     </div>
+                )}
+
+                {error && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-5 py-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700 text-sm shadow-lg">
+                        <AlertCircle size={18} /> {error}
+                    </div>
+                )}
+
+                {!loading && !error && heatPoints.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center z-[500] pointer-events-none">
+                        <div className="text-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                            <Map className="mx-auto text-slate-300" size={44} />
+                            <p className="font-bold text-slate-600 dark:text-slate-300">No complaints with location data</p>
+                            <p className="text-xs text-slate-400">Complaints submitted with GPS enabled will appear here</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Re-center button */}
+                {userLocation && (
+                    <div className="absolute bottom-5 left-5 z-[1000]">
+                        <button onClick={() => setRecenterTrigger(t => t + 1)} title="Re-center on my location"
+                            className="p-3 bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 backdrop-blur-md rounded-xl text-slate-600 dark:text-slate-300 hover:text-[#FF9933] shadow-lg transition-all active:scale-95">
+                            <LocateFixed size={22} />
+                        </button>
+                    </div>
+                )}
+
+                {/* Legend */}
+                <div className="absolute bottom-5 right-5 z-[1000] bg-white/90 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-xl min-w-[140px]">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1">
+                        <Flame size={10} className="text-[#FF9933]" /> Intensity
+                    </p>
+                    <div className="w-full h-3 rounded-full mb-2" style={{ background: 'linear-gradient(to right,#313695,#4575b4,#74add1,#fee090,#f46d43,#d73027,#a50026)' }} />
+                    <div className="flex justify-between text-[9px] font-bold text-slate-400 mb-3">
+                        <span>Sparse</span><span>Hotspot</span>
+                    </div>
+                    {[
+                        { label: 'Critical', color: '#a50026' },
+                        { label: 'High', color: '#d73027' },
+                        { label: 'Medium', color: '#f46d43' },
+                        { label: 'Low', color: '#4575b4' },
+                    ].map(({ label, color }) => (
+                        <div key={label} className="flex items-center gap-2 mb-1">
+                            <div className="w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: color }} />
+                            <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">{label}</span>
+                        </div>
+                    ))}
                 </div>
 
-                <div className="p-3 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md rounded-lg border border-slate-200 dark:border-slate-800 shadow-lg">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase">Current View</p>
-                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{filteredComplaints.length} Data Points</p>
-                </div>
+                <MapContainer center={defaultCenter} zoom={12} scrollWheelZoom className="h-full w-full z-0" style={{ height: '100%', width: '100%' }}>
+                    <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    />
+                    <HeatLayer points={heatPoints} />
+
+                    {showMarkers && filteredComplaints.map(complaint => (
+                        <Marker key={complaint.id} position={[complaint.latitude, complaint.longitude]} icon={createIcon(complaint.priority || 'medium')}>
+                            <Popup>
+                                <div className="space-y-2 w-64 p-1">
+                                    <div className="font-bold text-slate-900 border-b pb-1">{complaint.title}</div>
+                                    <div className="text-xs text-slate-600 line-clamp-3">{complaint.description}</div>
+                                    <div className="text-[10px] text-slate-500 italic">{complaint.address}</div>
+                                    <div className="flex gap-2 pt-1">
+                                        <span className={`px-2 py-0.5 text-[10px] font-black rounded uppercase ${getPriorityBg(complaint.priority)} text-white`}>
+                                            {complaint.priority || 'medium'}
+                                        </span>
+                                        <span className="px-2 py-0.5 text-[10px] font-black rounded uppercase bg-slate-100 text-slate-600">
+                                            {complaint.status.replace(/_/g, ' ')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </Popup>
+                        </Marker>
+                    ))}
+
+                    {userLocation && (
+                        <Marker position={userLocation} icon={createUserIcon()}>
+                            <Popup><div className="font-bold text-sm">You are here</div></Popup>
+                        </Marker>
+                    )}
+
+                    <MapController
+                        complaints={filteredComplaints}
+                        userLocation={userLocation}
+                        recenterTrigger={recenterTrigger}
+                    />
+                </MapContainer>
             </div>
 
-            <MapContainer center={defaultPosition} zoom={12} scrollWheelZoom={true} className="h-full w-full z-0">
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
-                
-                <HeatLayer points={heatPoints} />
-                
-                {showMarkers && filteredComplaints.map((complaint) => (
-                    <Marker key={complaint.id} position={[complaint.latitude, complaint.longitude]} icon={createIcon(complaint.priority || 'low')}>
-                        <Popup>
-                            <div className="space-y-2 w-64 p-1">
-                                <div className="font-bold text-slate-900 border-b pb-1 mb-1">{complaint.title}</div>
-                                <div className="text-xs text-slate-600 line-clamp-3">{complaint.description}</div>
-                                <div className="text-[10px] text-slate-500 italic">{complaint.address}</div>
-                                <div className="flex gap-2 pt-2">
-                                    <span className={`px-2 py-0.5 text-[10px] font-black rounded uppercase ${getPriorityColor(complaint.priority)} text-white`}>
-                                        {complaint.priority || 'MEDIUM'}
-                                    </span>
-                                    <span className={`px-2 py-0.5 text-[10px] font-black rounded uppercase ${getStatusColor(complaint.status)} bg-slate-100 dark:bg-slate-800`}>
-                                        {complaint.status.replace(/_/g, ' ')}
-                                    </span>
-                                </div>
-                            </div>
-                        </Popup>
-                    </Marker>
-                ))}
-
-                {userLocation && (
-                    <Marker position={userLocation} icon={createUserIcon()}>
-                        <Popup><div className="font-bold">You are here</div></Popup>
-                    </Marker>
-                )}
-                
-                <MapController userLocation={userLocation} recenterTrigger={recenterTrigger} complaints={filteredComplaints} />
-            </MapContainer>
+            <div className="mt-3 flex items-center gap-2 text-xs text-slate-400 px-1">
+                <Info size={13} />
+                Heatmap intensity is weighted by complaint priority — critical issues glow brighter. Toggle markers to see individual complaint details.
+            </div>
         </div>
     );
+};
+
+/* ─── Smart Dispatcher — Single Route, Two Experiences ──────── */
+const HeatmapView: React.FC = () => {
+    const { user } = useAuth();
+
+    if (!user || user?.role === 'citizen') {
+        return <CitizenHeatmap />;
+    }
+
+    return <AdminHeatmapView />;
 };
 
 export default HeatmapView;

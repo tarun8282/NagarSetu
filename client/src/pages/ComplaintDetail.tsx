@@ -56,23 +56,23 @@ interface TimelineItem {
 
 /* ─── helpers ─────────────────────────────────────────────── */
 const STATUS_META: Record<string, { color: string; bg: string; label: string }> = {
-    resolved:     { color: '#138808', bg: '#13880812', label: 'Resolved' },
-    in_progress:  { color: '#FF9933', bg: '#FF993312', label: 'In Progress' },
+    resolved: { color: '#138808', bg: '#13880812', label: 'Resolved' },
+    in_progress: { color: '#FF9933', bg: '#FF993312', label: 'In Progress' },
     under_review: { color: '#f59e0b', bg: '#f59e0b12', label: 'Under Review' },
-    rejected:     { color: '#dc2626', bg: '#dc262612', label: 'Rejected' },
-    escalated:    { color: '#7c3aed', bg: '#7c3aed12', label: 'Escalated' },
-    pending:      { color: '#94a3b8', bg: '#94a3b812', label: 'Pending' },
+    rejected: { color: '#dc2626', bg: '#dc262612', label: 'Rejected' },
+    escalated: { color: '#7c3aed', bg: '#7c3aed12', label: 'Escalated' },
+    pending: { color: '#94a3b8', bg: '#94a3b812', label: 'Pending' },
 };
 
 const PRIORITY_META: Record<string, { color: string; bg: string }> = {
     critical: { color: '#dc2626', bg: '#dc262612' },
-    high:     { color: '#FF9933', bg: '#FF993312' },
-    medium:   { color: '#f59e0b', bg: '#f59e0b12' },
-    low:      { color: '#138808', bg: '#13880812' },
+    high: { color: '#FF9933', bg: '#FF993312' },
+    medium: { color: '#f59e0b', bg: '#f59e0b12' },
+    low: { color: '#138808', bg: '#13880812' },
 };
 
-const statusMeta = (s: string) => STATUS_META[s] || { color: '#94a3b8', bg: '#94a3b812', label: s.replace(/_/g,' ') };
-const capitalize = (s: string) => s.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+const statusMeta = (s: string) => STATUS_META[s] || { color: '#94a3b8', bg: '#94a3b812', label: s.replace(/_/g, ' ') };
+const capitalize = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 /* ─── Main Component ──────────────────────────────────────── */
 const ComplaintDetail: React.FC = () => {
@@ -112,10 +112,10 @@ const ComplaintDetail: React.FC = () => {
                     note: 'Complaint registered and assigned to department'
                 };
 
-                const sortedTimeline = [submissionEvent, ...timelineItems].sort((a, b) => 
+                const sortedTimeline = [submissionEvent, ...timelineItems].sort((a, b) =>
                     new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime()
                 );
-                
+
                 setTimeline(sortedTimeline as any);
             } catch (err: any) {
                 setError(err.message || 'Error loading details');
@@ -272,7 +272,7 @@ const ComplaintDetail: React.FC = () => {
                                                 className="w-full h-full cursor-pointer relative block"
                                                 onClick={(e) => { e.preventDefault(); setFullscreenImage(m.public_url); }}
                                             >
-                                                <img src={m.public_url} alt={`Evidence ${i+1}`}
+                                                <img src={m.public_url} alt={`Evidence ${i + 1}`}
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 relative z-0" />
                                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center pointer-events-none z-10">
                                                     <Eye size={20} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -577,15 +577,15 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
             formData.append('status', status);
             formData.append('remarks', remarks);
             formData.append('changed_by', user?.id || '');
-            
+
             if (evidence) {
                 // Attach the file AS 'proof' so the backend recognizes it for history/results
                 formData.append('proof', evidence);
             }
 
-            const res = await fetch(`/api/complaints/${complaintId}/status`, { 
-                method: 'PATCH', 
-                body: formData 
+            const res = await fetch(`/api/complaints/${complaintId}/status`, {
+                method: 'PATCH',
+                body: formData
             });
 
             if (!res.ok) {
@@ -596,11 +596,11 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
             setSuccess(true);
             setRemarks('');
             setEvidence(null);
-            
+
             // Re-fetch or reload to show the updated timeline
-            setTimeout(() => { 
-                setSuccess(false); 
-                onUpdate(); 
+            setTimeout(() => {
+                setSuccess(false);
+                onUpdate();
             }, 1000);
         } catch (err: any) {
             console.error(err);
