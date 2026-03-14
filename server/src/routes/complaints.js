@@ -131,14 +131,14 @@ router.post('/', upload.array('media', 5), async (req, res) => {
 
         // 8. Look up department
         let assignedDeptId = null;
-        let slaHours = 24;
+        let slaHours = 24; // default fallback
 
         // Map AI strict categories to realistic DB category slugs
         const categoryMap = {
             'road_pothole': 'pwd', 'road_damage': 'pwd',
             'water_leakage': 'water', 'water_shortage': 'water',
             'garbage_overflow': 'solidwaste', 'garbage_collection': 'solidwaste',
-            'electricity_outage': 'pwd', 'streetlight': 'pwd',
+            'electricity_outage': 'electricity', 'streetlight': 'electricity',
             'sanitation_drain': 'sewerage', 'sanitation_toilet': 'sewerage', 'flooding': 'sewerage',
             'illegal_construction': 'building', 'building_permit': 'building',
             'encroachment': 'townplanning',
@@ -148,9 +148,31 @@ router.post('/', upload.array('media', 5), async (req, res) => {
             'fire_hazard': 'fire',
             'other': 'admin'
         };
+
+        // Category-level SLA fallback (when the department's sla_hours is not set in DB)
+        const categorySlaMap = {
+            'electricity_outage': 6,  'streetlight': 6,
+            'garbage_overflow': 12,   'garbage_collection': 12,
+            'water_leakage': 24,      'water_shortage': 24, 'flooding': 24,
+            'road_pothole': 48,       'road_damage': 48,
+            'illegal_construction': 72, 'building_permit': 72, 'encroachment': 72,
+            'sanitation_drain': 24,   'sanitation_toilet': 24,
+            'fire_hazard': 6,         // fire is always urgent
+            'tree_fallen': 12,
+            'noise_pollution': 48,    'environment_pollution': 48,
+            'stray_animals': 24,
+            'park_damage': 72,
+            'other': 48
+        };
+
+        // Use category-level SLA as fallback default
+        const categoryDefaultSla = categorySlaMap[aiResult.category] || 24;
+        slaHours = categoryDefaultSla;
+
         const mappedSlug = categoryMap[aiResult.category] || 'admin';
 
         try {
+            // Try electricity slug first, then pwd as fallback for electrical issues
             let deptQuery = supabase
                 .from('departments')
                 .select('id, sla_hours')
@@ -163,7 +185,20 @@ router.post('/', upload.array('media', 5), async (req, res) => {
             const { data: deptDepts, error: deptError } = await deptQuery.limit(1);
             if (!deptError && deptDepts && deptDepts.length > 0) {
                 assignedDeptId = deptDepts[0].id;
-                slaHours = deptDepts[0].sla_hours || 24;
+                // Use DB sla_hours if set, otherwise use our category-based default
+                slaHours = deptDepts[0].sla_hours || categoryDefaultSla;
+            } else if (mappedSlug === 'electricity') {
+                // Fallback: try 'pwd' slug for electricity if no electricity dept exists
+                const { data: pwdDepts } = await supabase
+                    .from('departments')
+                    .select('id, sla_hours')
+                    .eq('category_slug', 'pwd')
+                    .eq('city_id', resolvedCityId)
+                    .limit(1);
+                if (pwdDepts && pwdDepts.length > 0) {
+                    assignedDeptId = pwdDepts[0].id;
+                    slaHours = categoryDefaultSla; // always use 6h for electricity even under PWD
+                }
             }
         } catch (deptErr) {
             console.warn('[DB] Department lookup failed:', deptErr.message);
@@ -305,6 +340,51 @@ async function uploadMediaFiles(complaintId, uploadedBy, files) {
         }
     }
 }
+
+// GET /api/complaints/heatmap — fast, lightweight endpoint for map rendering
+// Only returns complaints with valid lat/lng, no joins
+router.get('/heatmap', async (req, res) => {
+    try {
+        const { city_id, state_id } = req.query;
+
+        let query = supabase
+            .from('complaints')
+            .select('id, complaint_number, title, description, latitude, longitude, status, priority, address')
+            .not('latitude', 'is', null)
+            .not('longitude', 'is', null);
+
+        if (city_id) {
+            query = query.eq('city_id', city_id);
+        } else if (state_id) {
+            const { data: cities } = await supabase.from('cities').select('id').eq('state_id', state_id);
+            const cityIds = (cities || []).map(c => c.id);
+            if (cityIds.length > 0) {
+                query = query.in('city_id', cityIds);
+            } else {
+                return res.json({ success: true, complaints: [] });
+            }
+        }
+
+        const { data: complaints, error } = await query.order('created_at', { ascending: false });
+        if (error) throw error;
+
+        // Extra safety: filter out any rows where coords are 0,0 or invalid
+        const validComplaints = (complaints || []).filter(c =>
+            c.latitude && c.longitude &&
+            !isNaN(parseFloat(c.latitude)) && !isNaN(parseFloat(c.longitude)) &&
+            !(c.latitude === 0 && c.longitude === 0)
+        );
+
+        return res.json({ 
+            success: true, 
+            complaints: validComplaints,
+            total: validComplaints.length
+        });
+    } catch (error) {
+        console.error('[Heatmap] Error fetching complaints:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 router.get('/', async (req, res) => {
     try {

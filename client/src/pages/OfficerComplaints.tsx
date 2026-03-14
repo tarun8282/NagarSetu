@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { 
-    Search, 
-    Filter, 
-    Clock, 
-    ArrowLeft, 
-    Inbox, 
-    AlertTriangle, 
+import {
+    Search,
+    Filter,
+    Clock,
+    ArrowLeft,
+    Inbox,
+    AlertTriangle,
     Loader,
     ChevronRight,
     Calendar,
@@ -47,7 +47,7 @@ const OfficerComplaints: React.FC = () => {
         try {
             setLoading(true);
             let url = `/api/complaints?`;
-            
+
             if (cityFilter) {
                 url += `city_id=${cityFilter}`;
             } else if (user?.role === 'state_admin' && user?.state_id) {
@@ -61,7 +61,7 @@ const OfficerComplaints: React.FC = () => {
 
             const response = await fetch(url);
             const data = await response.json();
-            
+
             if (data.success) {
                 setComplaints(data.complaints || []);
             } else {
@@ -94,21 +94,21 @@ const OfficerComplaints: React.FC = () => {
 
     const getStatusStyle = (status: string) => {
         switch (status) {
-            case 'resolved':    return 'bg-emerald-50 text-emerald-700';
+            case 'resolved': return 'bg-emerald-50 text-emerald-700';
             case 'in_progress': return 'bg-amber-50 text-amber-700';
-            case 'under_review':return 'bg-orange-50 text-orange-600';
-            case 'escalated':   return 'bg-red-50 text-red-600';
-            case 'rejected':    return 'bg-slate-100 text-slate-500';
-            default:            return 'bg-orange-50 text-orange-600';
+            case 'under_review': return 'bg-orange-50 text-orange-600';
+            case 'escalated': return 'bg-red-50 text-red-600';
+            case 'rejected': return 'bg-slate-100 text-slate-500';
+            default: return 'bg-orange-50 text-orange-600';
         }
     };
 
     const getPriorityColor = (priority: string) => {
         switch (priority) {
             case 'critical': return '#dc2626';
-            case 'high':     return '#FF9933';
-            case 'medium':   return '#f59e0b';
-            default:         return '#138808';
+            case 'high': return '#FF9933';
+            case 'medium': return '#f59e0b';
+            default: return '#138808';
         }
     };
 
@@ -219,7 +219,7 @@ const OfficerComplaints: React.FC = () => {
                         const hoursLeft = differenceInHours(deadline, now);
                         const isRisk = hoursLeft < 24 && c.status !== 'resolved';
                         const priorityColor = getPriorityColor(c.priority);
-                        
+
                         const isResolved = c.status === 'resolved';
                         const resolvedTime = isResolved && c.resolved_at ? parseISO(c.resolved_at) : now;
                         const actualHoursLeft = differenceInHours(deadline, resolvedTime);
@@ -227,9 +227,8 @@ const OfficerComplaints: React.FC = () => {
 
                         return (
                             <Link key={c.id} to={`/complaint/${c.id}`}
-                                className={`group flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl border px-5 py-4 hover:shadow-md transition-all ${
-                                    isRisk ? 'border-red-200 bg-red-50/20' : 'border-slate-100 dark:border-slate-700 hover:border-[#FF9933]/30'
-                                }`}>
+                                className={`group flex items-center gap-4 bg-white dark:bg-slate-800 rounded-xl border px-5 py-4 hover:shadow-md transition-all ${isRisk ? 'border-red-200 bg-red-50/20' : 'border-slate-100 dark:border-slate-700 hover:border-[#FF9933]/30'
+                                    }`}>
 
                                 {/* Image or Priority indicator */}
                                 {c.complaint_media && c.complaint_media.length > 0 ? (

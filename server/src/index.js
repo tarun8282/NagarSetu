@@ -31,6 +31,7 @@ app.use('/api/alerts', require('./routes/alerts'));
 app.use('/api/cities', require('./routes/cities'));
 app.use('/api/states', require('./routes/states'));
 app.use('/api/mc', require('./routes/mc'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 
 // Basic Route
