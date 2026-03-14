@@ -96,26 +96,27 @@ const ComplaintDetail: React.FC = () => {
 
                 setComplaint(data.complaint);
 
-                const history: any[] = data.complaint.status_history || [];
-                const timelineItems: TimelineItem[] = history.map((item: any) => ({
+                const timelineItems = (data.complaint.status_history || []).map((item: any) => ({
                     new_status: item.new_status,
                     old_status: item.old_status || null,
-                    date: format(parseISO(item.created_at), 'dd MMM yyyy, HH:mm'),
-                    note: item.remarks || 'Status updated'
+                    date: item.created_at ? format(parseISO(item.created_at), 'dd MMM yyyy, HH:mm') : 'Date Unknown',
+                    rawDate: item.created_at || '',
+                    note: item.remarks || `Status moved to ${capitalize(item.new_status)}`
                 }));
 
-                // Always include the initial submission as the first event in history
-                const submissionEvent: TimelineItem = {
+                const submissionEvent = {
                     new_status: 'submitted',
                     old_status: null,
                     date: format(parseISO(data.complaint.created_at), 'dd MMM yyyy, HH:mm'),
-                    note: 'Complaint submitted and assigned'
+                    rawDate: data.complaint.created_at,
+                    note: 'Complaint registered and assigned to department'
                 };
 
-                const fullTimeline = [submissionEvent, ...timelineItems];
-
-                // If complaint is resolved, reverse will put resolved at top, submitted at bottom
-                setTimeline(fullTimeline.reverse());
+                const sortedTimeline = [submissionEvent, ...timelineItems].sort((a, b) => 
+                    new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime()
+                );
+                
+                setTimeline(sortedTimeline as any);
             } catch (err: any) {
                 setError(err.message || 'Error loading details');
             } finally {
@@ -576,29 +577,34 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
             formData.append('status', status);
             formData.append('remarks', remarks);
             formData.append('changed_by', user?.id || '');
-
-            const res = await fetch(`/api/complaints/${complaintId}/status`, { method: 'PATCH', body: formData });
-            if (!res.ok) throw new Error('Failed to update status');
-
+            
             if (evidence) {
-                const evForm = new FormData();
-                evForm.append('evidence', evidence);
-                evForm.append('uploaded_by', user?.id || '');
-                const evRes = await fetch(`/api/complaints/${complaintId}/evidence`, { method: 'POST', body: evForm });
+                // Attach the file AS 'proof' so the backend recognizes it for history/results
+                formData.append('proof', evidence);
+            }
 
-                if (!evRes.ok) {
-                    const errText = await evRes.text();
-                    throw new Error(`Failed to upload evidence photo: ${errText}`);
-                }
+            const res = await fetch(`/api/complaints/${complaintId}/status`, { 
+                method: 'PATCH', 
+                body: formData 
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || 'Failed to update status');
             }
 
             setSuccess(true);
             setRemarks('');
             setEvidence(null);
-            setTimeout(() => { setSuccess(false); onUpdate(); }, 1500);
-        } catch (err) {
+            
+            // Re-fetch or reload to show the updated timeline
+            setTimeout(() => { 
+                setSuccess(false); 
+                onUpdate(); 
+            }, 1000);
+        } catch (err: any) {
             console.error(err);
-            alert('Error updating status');
+            alert(err.message || 'Error updating status');
         } finally {
             setLoading(false);
         }

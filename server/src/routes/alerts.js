@@ -12,11 +12,13 @@ router.get('/', async (req, res) => {
             let filterParts = ['and(state_id.is.null,city_id.is.null)']; // General alerts
             
             if (state_id) {
-                filterParts.push(`and(state_id.eq.${state_id},city_id.is.null)`); // State-wide alerts
+                // If state_id is provided, show ALL alerts for that state (both state-wide and city-specific)
+                filterParts.push(`state_id.eq.${state_id}`); 
             }
             
             if (city_id) {
-                filterParts.push(`city_id.eq.${city_id}`); // City-specific alerts
+                // If city_id is provided (and maybe no state_id), show alerts for that city
+                filterParts.push(`city_id.eq.${city_id}`);
             }
             
             query = query.or(filterParts.join(','));

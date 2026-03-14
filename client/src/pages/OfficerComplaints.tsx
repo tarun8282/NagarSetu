@@ -15,8 +15,8 @@ import {
     X,
     Shield
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { format, parseISO, differenceInHours } from 'date-fns';
+import { useAuth } from '../context/AuthContext';
 
 interface Complaint {
     id: string;
@@ -34,30 +34,49 @@ interface Complaint {
 }
 
 const OfficerComplaints: React.FC = () => {
+    const { user } = useAuth();
     const [searchParams] = useSearchParams();
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
     const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || 'all');
+    const cityFilter = searchParams.get('city_id');
 
     const fetchComplaints = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('complaints')
-                .select('*, complaint_media(public_url)')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            setComplaints(data || []);
+            let url = `/api/complaints?`;
+            
+            if (cityFilter) {
+                url += `city_id=${cityFilter}`;
+            } else if (user?.role === 'state_admin' && user?.state_id) {
+                url += `state_id=${user.state_id}`;
+            } else if (user?.role === 'mc_admin' && user?.city_id) {
+                url += `city_id=${user.city_id}`;
+            } else if (user?.role === 'dept_officer') {
+                if (user.department_id) url += `department_id=${user.department_id}`;
+                else if (user.city_id) url += `city_id=${user.city_id}`;
+            }
+
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.success) {
+                setComplaints(data.complaints || []);
+            } else {
+                console.error('Failed to fetch complaints:', data.error);
+                setComplaints([]);
+            }
         } catch (err) {
             console.error('Error fetching complaints:', err);
+            setComplaints([]);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => { fetchComplaints(); }, []);
+    useEffect(() => { fetchComplaints(); }, [cityFilter, user?.id]);
 
     const filteredComplaints = useMemo(() => {
         return complaints.filter(c => {
@@ -105,7 +124,7 @@ const OfficerComplaints: React.FC = () => {
             {/* ── HEADER ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <Link to="/officer/dashboard"
+                    <Link to={user?.role === 'state_admin' ? '/state/dashboard' : (user?.role === 'mc_admin' ? '/admin/dashboard' : '/officer/dashboard')}
                         className="inline-flex items-center gap-1.5 text-slate-400 hover:text-[#FF9933] text-xs font-bold mb-2 transition-colors group">
                         <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" /> Dashboard
                     </Link>

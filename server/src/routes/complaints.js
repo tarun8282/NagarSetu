@@ -282,32 +282,62 @@ async function uploadMediaFiles(complaintId, uploadedBy, files) {
 
 router.get('/', async (req, res) => {
     try {
-        const { citizen_id } = req.query;
+        const { citizen_id, city_id, state_id, department_id } = req.query;
 
         let query = supabase.from('complaints').select('*');
-        if (citizen_id) query = query.eq('citizen_id', citizen_id);
+        
+        if (citizen_id) {
+            query = query.eq('citizen_id', citizen_id);
+        } else if (city_id) {
+            query = query.eq('city_id', city_id);
+        } else if (state_id) {
+            // Get all cities in this state to filter complaints
+            const { data: cities } = await supabase.from('cities').select('id').eq('state_id', state_id);
+            const cityIds = (cities || []).map(c => c.id);
+            if (cityIds.length > 0) {
+                query = query.in('city_id', cityIds);
+            } else {
+                return res.json({ success: true, complaints: [] });
+            }
+        }
+
+        if (department_id) {
+            query = query.eq('assigned_department_id', department_id);
+        }
 
         const { data: complaints, error } = await query.order('created_at', { ascending: false });
         if (error) throw error;
 
-        const complaintsWithAI = await Promise.all(
+        const complaintsWithDetails = await Promise.all(
             (complaints || []).map(async (complaint) => {
                 const { data: aiClassification } = await supabase
                     .from('ai_classifications')
                     .select('*')
                     .eq('complaint_id', complaint.id)
-                    .single();
+                    .maybeSingle();
 
                 const { data: media } = await supabase
                     .from('complaint_media')
                     .select('*')
                     .eq('complaint_id', complaint.id);
+                
+                // Get ward info if available
+                let wardName = 'N/A';
+                if (complaint.city_id) {
+                    const { data: city } = await supabase.from('cities').select('name').eq('id', complaint.city_id).maybeSingle();
+                    if (city) wardName = city.name;
+                }
 
-                return { ...complaint, ai_classification: aiClassification || null, complaint_media: media || [] };
+                return { 
+                    ...complaint, 
+                    ai_classification: aiClassification || null, 
+                    complaint_media: media || [],
+                    ward_number: complaint.ward_number || wardName
+                };
             })
         );
 
-        res.json({ success: true, complaints: complaintsWithAI });
+        res.json({ success: true, complaints: complaintsWithDetails });
     } catch (error) {
         console.error('Error fetching complaints:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -333,7 +363,7 @@ router.get('/:id', async (req, res) => {
             .from('ai_classifications')
             .select('*')
             .eq('complaint_id', complaint.id)
-            .single();
+            .maybeSingle();
 
         const { data: statusHistory } = await supabase
             .from('status_history')
@@ -378,27 +408,43 @@ router.patch('/:id/status', upload.array('proof', 1), async (req, res) => {
         if (fetchErr) throw fetchErr;
 
         // 2. Update complaint
-        const updateData = { status, updated_at: new Date().toISOString() };
-        if (status === 'resolved') updateData.resolved_at = new Date().toISOString();
+        const updateData = { 
+            status, 
+            updated_at: new Date().toISOString() 
+        };
+        if (status === 'resolved') {
+            updateData.resolved_at = new Date().toISOString();
+        }
 
         const { error: updateErr } = await supabase
             .from('complaints')
             .update(updateData)
             .eq('id', id);
-        if (updateErr) throw updateErr;
+        
+        if (updateErr) {
+            console.error('[DB] Status update failed:', updateErr.message);
+            throw updateErr;
+        }
 
         // 3. Log History
-        await supabase.from('status_history').insert({
+        const { error: historyErr } = await supabase.from('status_history').insert({
             complaint_id: id,
             old_status: current.status,
             new_status: status,
-            changed_by,
-            remarks
+            changed_by: (changed_by && changed_by.trim() !== "") ? changed_by : null,
+            remarks: remarks || `Status changed to ${status}`
         });
 
-        // 4. Handle proof files if any
-        if (proofFiles.length > 0) {
-            for (const file of proofFiles) {
+        if (historyErr) {
+            console.error('[DB] History logging failed:', historyErr.message);
+            // We don't necessarily want to fail the whole request if history fails, 
+            // but let's at least log it.
+        }
+
+        // 4. Handle proof files if any (field name 'proof' or 'evidence')
+        // req.files is handled by multer for array('proof', 1) or single('proof')
+        if (req.files && req.files.length > 0) {
+            for (const file of req.files) {
                 const storagePath = `proofs/${id}/${Date.now()}-${file.originalname}`;
                 const { error: uploadErr } = await supabase.storage
                     .from('complaint-media')
@@ -414,8 +460,10 @@ router.patch('/:id/status', upload.array('proof', 1), async (req, res) => {
                         storage_path: storagePath,
                         public_url: urlData.publicUrl,
                         is_resolution_proof: true,
-                        uploaded_by: changed_by
+                        uploaded_by: (changed_by && changed_by.trim() !== "") ? changed_by : null
                     });
+                } else {
+                    console.error('[Storage] Proof upload failed:', uploadErr.message);
                 }
             }
         }
