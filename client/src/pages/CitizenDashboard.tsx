@@ -178,7 +178,7 @@ const CitizenDashboard: React.FC = () => {
                                                 <div className="text-sm text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-1">
                                                     <span>Filed on {new Date(c.created_at).toLocaleDateString()}</span>
                                                     <span className="hidden sm:inline">•</span>
-                                                    <span>Ward 45</span>
+                                                    <span>Ward {user?.ward_number || '45'}</span>
                                                 </div>
                                             </div>
                                         </div>

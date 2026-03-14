@@ -539,10 +539,272 @@ function getPasswordResetEmailTemplate(resetLink) {
   `;
 }
 
+/**
+ * Send complaint submission confirmation email to citizen
+ */
+async function sendComplaintConfirmationEmail(email, fullName, complaint) {
+  if (!transporter) {
+    throw new Error('Email transporter not initialized');
+  }
+
+  const mailOptions = {
+    from: process.env.MAIL_FROM || process.env.GMAIL_USER || 'noreply@nagarsetu.com',
+    to: email,
+    subject: `NagarSetu - Complaint Registered: ${complaint.complaint_number}`,
+    html: getComplaintConfirmationTemplate(fullName, complaint),
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('[Mail Service] Complaint confirmation email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('[Mail Service] Error sending complaint confirmation email:', error);
+    // Non-fatal — don't throw, just warn
+    return { success: false, error: error.message };
+  }
+}
+
+function getComplaintConfirmationTemplate(fullName, complaint) {
+  const priorityColors = {
+    low: '#138808',
+    medium: '#f59e0b',
+    high: '#FF9933',
+    critical: '#dc2626',
+  };
+  const priColor = priorityColors[complaint.priority] || '#FF9933';
+  const trackUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/complaint/${complaint.id}`;
+  const slaDue = complaint.sla_deadline
+    ? new Date(complaint.sla_deadline).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
+    : 'N/A';
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #FF9933 0%, #e67300 100%); color: white; padding: 36px 32px; }
+        .header h1 { margin: 0 0 4px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+        .header p { margin: 0; font-size: 13px; opacity: 0.85; }
+        .badge { display: inline-block; background: rgba(255,255,255,0.2); border-radius: 20px; padding: 4px 14px; font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-top: 12px; text-transform: uppercase; }
+        .content { padding: 32px; }
+        .greeting { font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+        .sub { font-size: 14px; color: #64748b; margin-bottom: 24px; line-height: 1.6; }
+        .info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+        .info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+        .info-row:last-child { border-bottom: none; padding-bottom: 0; }
+        .info-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; width: 120px; flex-shrink: 0; padding-top: 2px; }
+        .info-value { font-size: 14px; font-weight: 600; color: #1e293b; text-align: right; flex: 1; }
+        .priority-badge { display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: white; background-color: ${priColor}; }
+        .description-box { background: #fffbeb; border-left: 4px solid #FF9933; padding: 14px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px; font-size: 14px; color: #44403c; line-height: 1.7; }
+        .cta-button { display: block; background: linear-gradient(135deg, #FF9933, #e67300); color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; text-align: center; margin-bottom: 24px; }
+        .note { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #166534; line-height: 1.6; margin-bottom: 20px; }
+        .footer { background-color: #f9fafb; padding: 20px 32px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e5e7eb; }
+        .footer a { color: #FF9933; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🏙️ NagarSetu</h1>
+          <p>Your complaint has been successfully registered</p>
+          <div class="badge">✓ Complaint Accepted</div>
+        </div>
+        <div class="content">
+          <div class="greeting">Hello ${fullName},</div>
+          <div class="sub">We've received your complaint and our AI system has validated and classified it. Your case is now assigned and being reviewed by the relevant department.</div>
+
+          <div class="info-card">
+            <div class="info-row">
+              <div class="info-label">Complaint No.</div>
+              <div class="info-value" style="font-family: monospace; color: #FF9933; font-size: 15px;">${complaint.complaint_number}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">Title</div>
+              <div class="info-value">${complaint.title}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">Category</div>
+              <div class="info-value">${(complaint.category || 'General').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">Priority</div>
+              <div class="info-value"><span class="priority-badge">${complaint.priority || 'medium'}</span></div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">Assigned To</div>
+              <div class="info-value">${complaint.department_name || 'Department'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">SLA Deadline</div>
+              <div class="info-value">${slaDue}</div>
+            </div>
+            ${complaint.address ? `<div class="info-row">
+              <div class="info-label">Address</div>
+              <div class="info-value" style="font-size: 13px;">${complaint.address}</div>
+            </div>` : ''}
+          </div>
+
+          ${complaint.description ? `<div class="description-box">
+            <strong style="display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#d97706; margin-bottom:6px;">Your Description</strong>
+            ${complaint.description}
+          </div>` : ''}
+
+          <a href="${trackUrl}" class="cta-button">🔍 Track My Complaint</a>
+
+          <div class="note">
+            ✅ <strong>What happens next?</strong><br>
+            A department officer will review your complaint and take action within the SLA deadline. You will receive updates on your registered email as the status changes.
+          </div>
+        </div>
+        <div class="footer">
+          <p style="margin: 0 0 8px 0;">© 2026 NagarSetu Initiative. A Vision for a Clean, Digitally Connected India.</p>
+          <p style="margin: 0;"><a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a> | <a href="#">Contact Support</a></p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Send status update notification email to citizen
+ */
+async function sendStatusUpdateEmail(email, fullName, complaint) {
+  if (!transporter) {
+    throw new Error('Email transporter not initialized');
+  }
+
+  const mailOptions = {
+    from: process.env.MAIL_FROM || process.env.GMAIL_USER || 'noreply@nagarsetu.com',
+    to: email,
+    subject: `NagarSetu - Update on ${complaint.complaint_number}: Status Changed to ${complaint.new_status.replace(/_/g, ' ').toUpperCase()}`,
+    html: getStatusUpdateTemplate(fullName, complaint),
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('[Mail Service] Status update email sent:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('[Mail Service] Error sending status update email:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function getStatusUpdateTemplate(fullName, complaint) {
+  const statusConfig = {
+    submitted:    { label: 'Submitted',    color: '#f59e0b', icon: '📋', bg: '#fffbeb' },
+    ai_processing:{ label: 'AI Processing',color: '#8b5cf6', icon: '🤖', bg: '#f5f3ff' },
+    under_review: { label: 'Under Review', color: '#3b82f6', icon: '🔍', bg: '#eff6ff' },
+    in_progress:  { label: 'In Progress',  color: '#FF9933', icon: '⚙️', bg: '#fff7ed' },
+    resolved:     { label: 'Resolved',     color: '#138808', icon: '✅', bg: '#f0fdf4' },
+    rejected:     { label: 'Rejected',     color: '#ef4444', icon: '❌', bg: '#fef2f2' },
+    escalated:    { label: 'Escalated',    color: '#dc2626', icon: '🚨', bg: '#fef2f2' },
+  };
+
+  const newMeta  = statusConfig[complaint.new_status]  || { label: complaint.new_status,  color: '#64748b', icon: '📌', bg: '#f8fafc' };
+  const oldMeta  = statusConfig[complaint.old_status]  || { label: complaint.old_status,  color: '#64748b', icon: '📌', bg: '#f8fafc' };
+  const trackUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/complaint/${complaint.id}`;
+  const isResolved = complaint.new_status === 'resolved';
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, ${newMeta.color} 0%, ${newMeta.color}cc 100%); color: white; padding: 36px 32px; }
+        .header h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 800; }
+        .header p { margin: 0; font-size: 13px; opacity: 0.9; }
+        .content { padding: 32px; }
+        .greeting { font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 8px; }
+        .sub { font-size: 14px; color: #64748b; margin-bottom: 24px; line-height: 1.6; }
+        .status-flow { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 20px; }
+        .status-pill { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .arrow { font-size: 20px; color: #94a3b8; }
+        .info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+        .info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; width: 120px; flex-shrink: 0; padding-top: 2px; }
+        .info-value { font-size: 14px; font-weight: 600; color: #1e293b; text-align: right; flex: 1; }
+        .remarks-box { background: ${newMeta.bg}; border-left: 4px solid ${newMeta.color}; padding: 14px 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px; font-size: 14px; color: #1e293b; line-height: 1.7; }
+        .cta-button { display: block; background: linear-gradient(135deg, #FF9933, #e67300); color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; text-align: center; margin-bottom: 24px; }
+        .resolved-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px 20px; font-size: 14px; color: #166534; line-height: 1.7; margin-bottom: 20px; }
+        .footer { background-color: #f9fafb; padding: 20px 32px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e5e7eb; }
+        .footer a { color: #FF9933; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>${newMeta.icon} Status Update</h1>
+          <p>Your complaint ${complaint.complaint_number} has a new update</p>
+        </div>
+        <div class="content">
+          <div class="greeting">Hello ${fullName},</div>
+          <div class="sub">There has been an update to your complaint. Here are the latest details:</div>
+
+          <div class="status-flow">
+            <span class="status-pill" style="color:${oldMeta.color}; background:${oldMeta.bg}; border: 1.5px solid ${oldMeta.color}33;">${oldMeta.icon} ${oldMeta.label}</span>
+            <span class="arrow">→</span>
+            <span class="status-pill" style="color:white; background:${newMeta.color};">${newMeta.icon} ${newMeta.label}</span>
+          </div>
+
+          <div class="info-card">
+            <div class="info-row">
+              <div class="info-label">Complaint No.</div>
+              <div class="info-value" style="font-family: monospace; color: #FF9933;">${complaint.complaint_number}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">Title</div>
+              <div class="info-value">${complaint.title}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">New Status</div>
+              <div class="info-value"><span style="color:${newMeta.color}; font-weight:800;">${newMeta.label}</span></div>
+            </div>
+            ${complaint.updated_at ? `<div class="info-row">
+              <div class="info-label">Updated At</div>
+              <div class="info-value">${new Date(complaint.updated_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}</div>
+            </div>` : ''}
+          </div>
+
+          ${complaint.remarks ? `<div class="remarks-box">
+            <strong style="display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:${newMeta.color}; margin-bottom:6px;">Officer Remarks</strong>
+            ${complaint.remarks}
+          </div>` : ''}
+
+          ${isResolved ? `<div class="resolved-box">
+            🎉 <strong>Your complaint has been resolved!</strong><br>
+            We hope the issue has been addressed to your satisfaction. You can now rate the resolution directly from your complaint detail page. Thank you for using NagarSetu!
+          </div>` : ''}
+
+          <a href="${trackUrl}" class="cta-button">🔍 View Complaint Details</a>
+        </div>
+        <div class="footer">
+          <p style="margin: 0 0 8px 0;">© 2026 NagarSetu Initiative. A Vision for a Clean, Digitally Connected India.</p>
+          <p style="margin: 0;"><a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a> | <a href="#">Contact Support</a></p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 module.exports = {
   initializeTransporter,
   generateOTP,
   sendOTPEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
+  sendComplaintConfirmationEmail,
+  sendStatusUpdateEmail,
 };

@@ -52,7 +52,7 @@ const App: React.FC = () => {
 
           {/* Officer — all three routes from admin-login branch */}
           <Route path="/officer/dashboard" element={user?.role === 'dept_officer' ? <OfficerDashboard /> : <Navigate to="/login" />} />
-          <Route path="/officer/complaints" element={user?.role === 'dept_officer' ? <OfficerComplaints /> : <Navigate to="/login" />} />
+          <Route path="/officer/complaints" element={(user?.role === 'dept_officer' || user?.role === 'state_admin' || user?.role === 'mc_admin') ? <OfficerComplaints /> : <Navigate to="/login" />} />
           <Route path="/officer/analytics" element={user?.role === 'dept_officer' ? <OfficerAnalytics /> : <Navigate to="/login" />} />
 
           {/* Admin Dashboards */}

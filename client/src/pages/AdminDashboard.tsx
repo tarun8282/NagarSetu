@@ -1,15 +1,72 @@
-import { BarChart3, TrendingUp, Users, AlertTriangle, Map as MapIcon, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BarChart3, TrendingUp, Users, AlertTriangle, Map as MapIcon, Download, Loader } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const AdminDashboard: React.FC = () => {
-    // Mock Admin Overview
+    const { user } = useAuth();
+    const [stats, setStats] = useState<any>(null);
+    const [deptPerf, setDeptPerf] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const fetchAnalytics = async () => {
+            try {
+                const cityId = user?.city_id || '';
+                const response = await fetch(`/api/analytics/admin?city_id=${cityId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    setStats(data.stats);
+                    setDeptPerf(data.deptPerformance);
+                } else {
+                    setError(data.error || 'Failed to fetch analytics');
+                }
+            } catch (err: any) {
+                setError(err.message || 'Error connecting to analytics');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAnalytics();
+    }, [user?.city_id]);
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <Loader className="w-10 h-10 animate-spin text-saffron" />
+                <p className="text-slate-400 font-medium">Loading Mumbai Intelligence...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-red-500 gap-2">
+                <AlertTriangle className="w-12 h-12" />
+                <p className="text-lg font-bold">{error}</p>
+            </div>
+        );
+    }
+
+    const kpiData = [
+        { label: 'Total Complaints', val: stats?.totalComplaints || 0, delta: '+0%', icon: <BarChart3 className="text-saffron-600" />, color: 'bg-saffron-100' },
+        { label: 'Resolution Rate', val: `${stats?.resolutionRate || 0}%`, delta: '+0%', icon: <TrendingUp className="text-india-green-600" />, color: 'bg-india-green-100' },
+        { label: 'Active Officers', val: stats?.activeOfficers || 0, delta: '0%', icon: <Users className="text-navy-blue-600" />, color: 'bg-navy-blue-100' },
+        { label: 'SLA Breaches', val: stats?.slaBreaches || 0, delta: '-0%', icon: <AlertTriangle className="text-saffron-700" />, color: 'bg-saffron-200' },
+    ];
+
     return (
         <div className="space-y-10 animate-in fade-in duration-1000">
             {/* Admin Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-1">
-                    <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Mumbai City Overview</h1>
-                    <p className="text-slate-500 font-medium">Real-time performance across all 12 departments.</p>
+                    <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                        {user?.cities?.name || 'Mumbai'} City Overview
+                    </h1>
+                    <p className="text-slate-500 font-medium">Real-time performance across all municipal departments.</p>
                 </div>
                 <button className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-all shadow-sm">
                     <Download size={18} /> Export Report
@@ -18,12 +75,7 @@ const AdminDashboard: React.FC = () => {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                    { label: 'Total Complaints', val: '1,284', delta: '+12%', icon: <BarChart3 className="text-saffron-600" />, color: 'bg-saffron-100' },
-                    { label: 'Resolution Rate', val: '84.2%', delta: '+5.4%', icon: <TrendingUp className="text-india-green-600" />, color: 'bg-india-green-100' },
-                    { label: 'Active Officers', val: '142', delta: '0%', icon: <Users className="text-navy-blue-600" />, color: 'bg-navy-blue-100' },
-                    { label: 'SLA Breaches', val: '24', delta: '-15%', icon: <AlertTriangle className="text-saffron-700" />, color: 'bg-saffron-200' },
-                ].map((kpi, i) => (
+                {kpiData.map((kpi, i) => (
                     <div key={i} className="bg-white dark:bg-slate-800 p-8 rounded-lg border border-slate-200 dark:border-slate-700 space-y-4 hover:shadow-xl transition-shadow relative overflow-hidden">
                         <div className={`w-14 h-14 ${kpi.color} rounded-lg flex items-center justify-center`}>
                            {kpi.icon}
@@ -46,23 +98,19 @@ const AdminDashboard: React.FC = () => {
                         <TrendingUp className="text-saffron-600" /> Department Performance
                     </h3>
                     <div className="space-y-6">
-                        {[
-                            { dept: 'Water Supply', rate: 94, color: 'bg-india-green-600' },
-                            { dept: 'Solid Waste', rate: 88, color: 'bg-india-green-500' },
-                            { dept: 'Roads & Traffic', rate: 72, color: 'bg-saffron-400' },
-                            { dept: 'Electricity', rate: 91, color: 'bg-india-green-400' },
-                            { dept: 'Sanitation', rate: 65, color: 'bg-saffron-600' },
-                        ].map((d, i) => (
+                        {deptPerf.length > 0 ? deptPerf.map((d, i) => (
                             <div key={i} className="space-y-2">
                                 <div className="flex justify-between text-sm font-bold uppercase tracking-tighter">
                                     <span className="text-slate-700 dark:text-slate-300">{d.dept}</span>
                                     <span className="text-slate-900 dark:text-white">{d.rate}% Resolved</span>
                                 </div>
                                 <div className="h-3 bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden">
-                                    <div className={`h-full ${d.color} transition-all duration-1000`} style={{ width: `${d.rate}%` }}></div>
+                                    <div className={`h-full bg-saffron transition-all duration-1000`} style={{ width: `${d.rate}%` }}></div>
                                 </div>
                             </div>
-                        ))}
+                        )) : (
+                            <p className="text-slate-400 italic">No department data available yet.</p>
+                        )}
                     </div>
                 </div>
 

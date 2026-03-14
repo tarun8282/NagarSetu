@@ -112,51 +112,120 @@ const Navbar: React.FC = () => {
             </div>
           )}
 
-          {/* 3-dots dropdown — Home, Heatmap, and Logout */}
-          <div className="relative desktop-dropdown-container">
-            <button
-              onClick={() => setIsDesktopMenuOpen(!isDesktopMenuOpen)}
-              className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
-                isDesktopMenuOpen
-                  ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <MoreVertical size={20} />
-            </button>
-
-            <div
-              className={`absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 transition-all duration-200 py-2 origin-top-right transform ${
-                isDesktopMenuOpen
-                  ? 'opacity-100 visible scale-100'
-                  : 'opacity-0 invisible scale-95'
-              }`}
-            >
-              <Link
-                to="/"
-                onClick={() => setIsDesktopMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-saffron transition-colors font-medium"
+          {/* User Profile Dropdown — Home, Heatmap, and Logout */}
+          {user ? (
+            <div className="relative desktop-dropdown-container">
+              <button
+                onClick={() => setIsDesktopMenuOpen(!isDesktopMenuOpen)}
+                className={`flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border transition-all duration-300 ${
+                  isDesktopMenuOpen
+                    ? 'bg-slate-100 dark:bg-slate-800 border-saffron/30 ring-4 ring-saffron/5'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-saffron/30 hover:shadow-sm'
+                }`}
               >
-                <Home size={18} /> Home
-              </Link>
-              <Link
-                to="/heatmap"
-                onClick={() => setIsDesktopMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-saffron transition-colors font-medium border-b border-slate-100 dark:border-slate-700/50"
-              >
-                <Map size={18} /> Heatmap
-              </Link>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-saffron to-orange-600 flex items-center justify-center text-white font-bold text-xs border-2 border-white dark:border-slate-800 shadow-sm">
+                  {user.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+                </div>
+                <div className="text-left hidden lg:block pr-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-0.5">
+                    {user.role?.replace('_', ' ') || 'Citizen'}
+                  </p>
+                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-none">
+                    {user.full_name?.split(' ')[0] || 'User'}
+                  </p>
+                </div>
+                <MoreVertical size={16} className="text-slate-400" />
+              </button>
 
-              {user && (
-                <button
-                  onClick={() => signOut()}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium text-left"
+              <div
+                className={`absolute right-0 mt-3 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 transition-all duration-300 py-3 origin-top-right transform ${
+                  isDesktopMenuOpen
+                    ? 'opacity-100 visible translate-y-0 scale-100'
+                    : 'opacity-0 invisible -translate-y-2 scale-95'
+                }`}
+              >
+                {/* Dropdown Header */}
+                <div className="px-5 py-3 mb-2 border-b border-slate-100 dark:border-slate-800/50">
+                  <p className="text-sm font-black text-slate-900 dark:text-white truncate">
+                    {user.full_name}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                      user.role === 'state_admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                      user.role === 'mc_admin' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                      user.role === 'dept_officer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                      'bg-india-green-100 text-india-green-700 dark:bg-india-green-900/30 dark:text-india-green-400'
+                    }`}>
+                      {user.role?.replace('_', ' ') || 'Citizen'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium truncate italic max-w-[120px]">
+                      {user.email}
+                    </span>
+                  </div>
+                </div>
+
+                <Link
+                  to="/"
+                  onClick={() => setIsDesktopMenuOpen(false)}
+                  className="flex items-center gap-3 px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-saffron transition-colors font-bold text-sm"
                 >
-                  <LogOut size={18} /> Logout
-                </button>
-              )}
+                  <Home size={18} /> Home View
+                </Link>
+                <Link
+                  to="/heatmap"
+                  onClick={() => setIsDesktopMenuOpen(false)}
+                  className="flex items-center gap-3 px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-saffron transition-colors font-bold text-sm"
+                >
+                  <Map size={18} /> Intelligence Map
+                </Link>
+
+                <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                  <button
+                    onClick={() => signOut()}
+                    className="w-full flex items-center gap-3 px-5 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-black text-sm text-left uppercase tracking-wider"
+                  >
+                    <LogOut size={18} /> Exit Application
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="relative desktop-dropdown-container">
+              <button
+                onClick={() => setIsDesktopMenuOpen(!isDesktopMenuOpen)}
+                className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
+                  isDesktopMenuOpen
+                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <MoreVertical size={20} />
+              </button>
+
+              <div
+                className={`absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 transition-all duration-200 py-2 origin-top-right transform ${
+                  isDesktopMenuOpen
+                    ? 'opacity-100 visible scale-100'
+                    : 'opacity-0 invisible scale-95'
+                }`}
+              >
+                <Link
+                  to="/"
+                  onClick={() => setIsDesktopMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-saffron transition-colors font-medium"
+                >
+                  <Home size={18} /> Home
+                </Link>
+                <Link
+                  to="/heatmap"
+                  onClick={() => setIsDesktopMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-saffron transition-colors font-medium"
+                >
+                  <Map size={18} /> Heatmap
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Mobile menu button ── */}
@@ -173,38 +242,57 @@ const Navbar: React.FC = () => {
       {/* ── Mobile Menu ── */}
       {isMenuOpen && (
         <div className="md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-4 flex flex-col gap-4 animate-in slide-in-from-top duration-300">
-          <Link to="/" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}>
-            <Home size={18} /> Home
+          {user && (
+            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl mb-2">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-saffron to-orange-600 flex items-center justify-center text-white font-bold border-2 border-white dark:border-slate-800">
+                {user.full_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-slate-900 dark:text-white truncate">{user.full_name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full inline-block ${
+                    user.role === 'state_admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                    user.role === 'mc_admin' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                    user.role === 'dept_officer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                    'bg-india-green-100 text-india-green-700 dark:bg-india-green-900/30 dark:text-india-green-400'
+                  }`}>
+                    {user.role?.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Link to="/" className="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 font-bold" onClick={() => setIsMenuOpen(false)}>
+            <Home size={18} /> Home View
           </Link>
-          <Link to="/heatmap" className="flex items-center gap-2 text-slate-600 dark:text-slate-300" onClick={() => setIsMenuOpen(false)}>
-            <Map size={18} /> Heatmap
+          <Link to="/heatmap" className="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 font-bold" onClick={() => setIsMenuOpen(false)}>
+            <Map size={18} /> Intelligence Map
           </Link>
 
           {user && (
             <>
-              {/* Role-aware dashboard link — from admin-login */}
               <Link
                 to={dashboardPath}
-                className="flex items-center gap-2 text-slate-600 dark:text-slate-300"
+                className="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 font-bold"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <LayoutDashboard size={18} /> Dashboard
+                <LayoutDashboard size={18} /> My Dashboard
               </Link>
 
-              {/* Alerts link — from main */}
               <Link
                 to="/alerts"
-                className="flex items-center gap-2 text-slate-600 dark:text-slate-300"
+                className="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 font-bold"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <Bell size={18} /> Alerts
+                <Bell size={18} /> Emergency Alerts
               </Link>
 
               <button
                 onClick={() => { signOut(); setIsMenuOpen(false); }}
-                className="flex items-center gap-2 text-red-500"
+                className="flex items-center gap-3 px-3 py-2 text-red-500 font-black uppercase tracking-wider mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/50"
               >
-                <LogOut size={18} /> Logout
+                <LogOut size={18} /> Exit Application
               </button>
             </>
           )}

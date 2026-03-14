@@ -11,11 +11,9 @@ import {
     ArrowRight,
     Loader,
     Calendar,
-    ChevronRight,
     Inbox,
     Activity,
     Target,
-    Shield,
     Zap,
     Star
 } from 'lucide-react';
@@ -49,10 +47,24 @@ const DepartmentDashboard: React.FC = () => {
 
     const fetchComplaints = useCallback(async () => {
         try {
-            const { data, error: fetchError } = await supabase
+            if (!user?.department_id) {
+                console.warn('No department_id found for officer');
+                setLoading(false);
+                return;
+            }
+
+            let query = supabase
                 .from('complaints')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .eq('assigned_department_id', user.department_id);
+
+            // If city_id is present, filter by it too
+            if (user.city_id) query = query.eq('city_id', user.city_id);
+            // If ward_number is present (some officers might be ward-specific)
+            if (user.ward_number) query = query.eq('ward_number', user.ward_number);
+
+            const { data, error: fetchError } = await query.order('created_at', { ascending: false });
+            
             if (fetchError) throw fetchError;
             setComplaints(data || []);
         } catch (err: any) {
@@ -101,16 +113,6 @@ const DepartmentDashboard: React.FC = () => {
         critical: complaints.filter(c => c.priority === 'critical').length,
     }), [complaints]);
 
-    const slaRiskComplaints = useMemo(() => {
-        const now = new Date();
-        return complaints
-            .filter(c => c.status !== 'resolved' && c.status !== 'rejected')
-            .map(c => ({ ...c, hoursLeft: differenceInHours(parseISO(c.sla_deadline), now) }))
-            .filter(c => c.hoursLeft < 24)
-            .sort((a, b) => a.hoursLeft - b.hoursLeft)
-            .slice(0, 5);
-    }, [complaints]);
-
     const categoryDistribution = useMemo(() => {
         const counts: Record<string, number> = {};
         complaints.forEach(c => { counts[c.category] = (counts[c.category] || 0) + 1; });
@@ -129,27 +131,6 @@ const DepartmentDashboard: React.FC = () => {
         const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
         return { resolutionRate, slaComplianceRate, avgRating };
     }, [complaints]);
-
-    // ── UI Helpers ──
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'resolved':     return 'bg-emerald-50 text-emerald-700';
-            case 'in_progress':  return 'bg-amber-50 text-amber-700';
-            case 'under_review': return 'bg-orange-50 text-orange-600';
-            case 'escalated':    return 'bg-red-50 text-red-700';
-            case 'rejected':     return 'bg-slate-100 text-slate-500';
-            default:             return 'bg-orange-50 text-orange-600';
-        }
-    };
-
-    const getPriorityDot = (priority: string) => {
-        switch (priority) {
-            case 'critical': return '#dc2626';
-            case 'high':     return '#FF9933';
-            case 'medium':   return '#f59e0b';
-            default:         return '#138808';
-        }
-    };
 
     if (loading) {
         return (
