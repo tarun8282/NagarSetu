@@ -3,6 +3,7 @@ const router = express.Router();
 const { supabase } = require('../lib/supabase');
 const { validateAndClassify } = require('../services/ai.service');
 const { reverseGeocode } = require('../services/geo.service');
+const { sendComplaintConfirmationEmail, sendStatusUpdateEmail } = require('../services/mail.service');
 const multer = require('multer');
 const path = require('path');
 
@@ -220,7 +221,32 @@ router.post('/', upload.array('media', 5), async (req, res) => {
             }
         }
 
-        // 13. Return success
+        // 13. Send confirmation email (non-blocking)
+        try {
+            const { data: citizen } = await supabase
+                .from('citizens')
+                .select('email, full_name')
+                .eq('id', citizen_id)
+                .single();
+
+            if (citizen?.email) {
+                sendComplaintConfirmationEmail(citizen.email, citizen.full_name || 'Citizen', {
+                    id: complaint.id,
+                    complaint_number: complaintNumber,
+                    title,
+                    description,
+                    category: aiResult.category,
+                    priority: aiResult.severity,
+                    department_name: aiResult.department_name,
+                    address: resolvedAddress,
+                    sla_deadline: complaint.sla_deadline,
+                }).catch(e => console.error('[Mail] Failed to send confirmation email:', e.message));
+            }
+        } catch (emailErr) {
+            console.warn('[Mail] Could not fetch citizen for email:', emailErr.message);
+        }
+
+        // 14. Return success
         return res.status(201).json({
             success: true,
             complaint_id: complaint.id,
@@ -419,6 +445,45 @@ router.patch('/:id/status', upload.array('proof', 1), async (req, res) => {
                 }
             }
         }
+
+        // 5. Send status update email to citizen (non-blocking, fire-and-forget)
+        // Use separate queries to avoid join issues
+        (async () => {
+            try {
+                const { data: complaintData } = await supabase
+                    .from('complaints')
+                    .select('citizen_id, complaint_number, title')
+                    .eq('id', id)
+                    .single();
+
+                if (!complaintData?.citizen_id) return;
+
+                const { data: citizenData } = await supabase
+                    .from('citizens')
+                    .select('email, full_name')
+                    .eq('id', complaintData.citizen_id)
+                    .single();
+
+                if (citizenData?.email) {
+                    await sendStatusUpdateEmail(
+                        citizenData.email,
+                        citizenData.full_name || 'Citizen',
+                        {
+                            id,
+                            complaint_number: complaintData.complaint_number,
+                            title: complaintData.title,
+                            old_status: current.status,
+                            new_status: status,
+                            remarks,
+                            updated_at: new Date().toISOString(),
+                        }
+                    );
+                    console.log(`[Mail] Status update email sent to ${citizenData.email}`);
+                }
+            } catch (emailErr) {
+                console.warn('[Mail] Status update email failed (non-fatal):', emailErr.message);
+            }
+        })();
 
         res.json({ success: true, message: 'Status updated successfully' });
     } catch (error) {
