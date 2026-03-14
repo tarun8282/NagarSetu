@@ -127,7 +127,6 @@ const CitizenHeatmap: React.FC = () => {
     const [error, setError] = useState('');
     const [filterPriority, setFilterPriority] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<string>('all');
-    const [showMarkers, setShowMarkers] = useState(true);
     const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
     const [recenterTrigger, setRecenterTrigger] = useState(0);
 
@@ -172,11 +171,6 @@ const CitizenHeatmap: React.FC = () => {
         high: complaints.filter(c => (c.priority || '').toLowerCase() === 'high').length,
         medium: complaints.filter(c => (c.priority || '').toLowerCase() === 'medium').length,
         low: complaints.filter(c => (c.priority || '').toLowerCase() === 'low').length,
-    };
-
-    const getPriorityBg = (priority?: string) => {
-        const map: Record<string, string> = { critical: 'bg-red-900', high: 'bg-red-500', medium: 'bg-orange-500', low: 'bg-green-500' };
-        return map[priority?.toLowerCase() || ''] || 'bg-slate-500';
     };
 
     return (
@@ -225,11 +219,6 @@ const CitizenHeatmap: React.FC = () => {
                     <option value="resolved">Resolved</option>
                     <option value="escalated">Escalated</option>
                 </select>
-                <button
-                    onClick={() => setShowMarkers(v => !v)}
-                    className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-[#FF9933]/50 transition-colors">
-                    {showMarkers ? 'Hide Markers' : 'Show Markers'}
-                </button>
                 <span className="ml-auto text-xs text-slate-400 font-medium">{heatPoints.length} of {complaints.length} points shown</span>
             </div>
 
@@ -301,26 +290,6 @@ const CitizenHeatmap: React.FC = () => {
                     />
                     <HeatLayer points={heatPoints} />
 
-                    {showMarkers && filteredComplaints.map(complaint => (
-                        <Marker key={complaint.id} position={[complaint.latitude, complaint.longitude]} icon={createIcon(complaint.priority || 'medium')}>
-                            <Popup>
-                                <div className="space-y-2 w-64 p-1">
-                                    <div className="font-bold text-slate-900 border-b pb-1">{complaint.title}</div>
-                                    <div className="text-xs text-slate-600 line-clamp-3">{complaint.description}</div>
-                                    <div className="text-[10px] text-slate-500 italic">{complaint.address}</div>
-                                    <div className="flex gap-2 pt-1">
-                                        <span className={`px-2 py-0.5 text-[10px] font-black rounded uppercase ${getPriorityBg(complaint.priority)} text-white`}>
-                                            {complaint.priority || 'medium'}
-                                        </span>
-                                        <span className="px-2 py-0.5 text-[10px] font-black rounded uppercase bg-slate-100 text-slate-600">
-                                            {complaint.status.replace(/_/g, ' ')}
-                                        </span>
-                                    </div>
-                                </div>
-                            </Popup>
-                        </Marker>
-                    ))}
-
                     {userLocation && (
                         <Marker position={userLocation} icon={createUserIcon()}>
                             <Popup><div className="font-bold text-sm">You are here</div></Popup>
@@ -337,7 +306,7 @@ const CitizenHeatmap: React.FC = () => {
 
             <div className="mt-3 flex items-center gap-2 text-xs text-slate-400 px-1">
                 <Info size={13} />
-                Heatmap intensity is weighted by complaint priority — critical issues glow brighter. Toggle markers to see individual complaint details.
+                Heatmap intensity is weighted by complaint priority — critical issues glow brighter.
             </div>
         </div>
     );

@@ -55,7 +55,7 @@ app.use((err, req, res, next) => {
     // Write to a log file so we can see it in this environment
     try {
         require('fs').appendFileSync('server_errors.log', `[${new Date().toISOString()}] ${req.method} ${req.url}\n${err.stack}\n\n`);
-    } catch (e) {}
+    } catch (e) { }
 
     res.status(err.status || 500).json({
         success: false,
