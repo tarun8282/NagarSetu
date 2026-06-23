@@ -324,6 +324,8 @@ const ComplaintDetail: React.FC = () => {
                             complaintId={complaint.id}
                             currentStatus={complaint.status}
                             onUpdate={() => window.location.reload()}
+                            incidentLat={complaint.latitude}
+                            incidentLon={complaint.longitude}
                         />
                     )}
 
@@ -558,9 +560,112 @@ const ComplaintDetail: React.FC = () => {
     );
 };
 
+/* ─── Distance Helper (Haversine Formula) ──────────────────── */
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3; // metres
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // distance in metres
+};
+
+/* ─── Camera Modal Component ─────────────────────────────── */
+const CameraModal: React.FC<{
+    onCapture: (file: File) => void;
+    onClose: () => void;
+}> = ({ onCapture, onClose }) => {
+    const videoRef = React.useRef<HTMLVideoElement>(null);
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    const [stream, setStream] = React.useState<MediaStream | null>(null);
+    const [cameraError, setCameraError] = React.useState('');
+
+    React.useEffect(() => {
+        const startCamera = async () => {
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                setStream(s);
+                if (videoRef.current) videoRef.current.srcObject = s;
+            } catch (err) {
+                setCameraError('Could not access camera. Please check permissions.');
+            }
+        };
+        startCamera();
+        return () => {
+            if (stream) stream.getTracks().forEach(track => track.stop());
+        };
+    }, []);
+
+    const handleCapture = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const file = new File([blob], `evidence_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    onCapture(file);
+                    onClose();
+                }
+            }, 'image/jpeg', 0.85);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[2000] bg-black flex flex-col items-center justify-center p-4">
+            <div className="relative w-full max-w-md aspect-[3/4] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+                {cameraError ? (
+                    <div className="h-full flex flex-col items-center justify-center p-6 text-center text-white">
+                        <AlertTriangle size={40} className="text-red-500 mb-4" />
+                        <p className="font-bold">{cameraError}</p>
+                        <button onClick={onClose} className="mt-6 px-6 py-2 bg-white/10 rounded-xl font-bold">Close</button>
+                    </div>
+                ) : (
+                    <>
+                        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
+                            <div className="px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg text-[10px] text-white font-black uppercase tracking-widest border border-white/10">
+                                Live View
+                            </div>
+                            <button onClick={onClose} className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white">
+                                <AlertCircle size={20} className="rotate-45" />
+                            </button>
+                        </div>
+                        <div className="absolute bottom-6 inset-x-0 flex items-center justify-center">
+                            <button
+                                onClick={handleCapture}
+                                className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center group active:scale-90 transition-all"
+                            >
+                                <div className="w-12 h-12 rounded-full bg-white group-hover:bg-slate-200 transition-colors" />
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
+            <p className="mt-6 text-slate-400 text-xs font-bold uppercase tracking-widest">Capture operational evidence at the site</p>
+        </div>
+    );
+};
+
 /* ─── Officer Action Panel ────────────────────────────────── */
-const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string; onUpdate: () => void }> = ({
-    complaintId, currentStatus, onUpdate
+const OfficerActionPanel: React.FC<{
+    complaintId: string;
+    currentStatus: string;
+    onUpdate: () => void;
+    incidentLat: number;
+    incidentLon: number;
+}> = ({
+    complaintId, currentStatus, onUpdate, incidentLat, incidentLon
 }) => {
     const { user } = useAuth();
     const [status, setStatus] = useState(currentStatus);
@@ -569,8 +674,56 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
 
+    // Geolocation / Validation / Camera states
+    const [geoLoading, setGeoLoading] = useState(false);
+    const [officerLocation, setOfficerLocation] = useState<{ lat: number, lon: number } | null>(null);
+    const [distanceError, setDistanceError] = useState('');
+    const [isWithinRange, setIsWithinRange] = useState(true);
+    const [showCamera, setShowCamera] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    const validateLocation = (lat: number, lon: number) => {
+        setOfficerLocation({ lat, lon });
+        if (incidentLat && incidentLon) {
+            const dist = getDistance(lat, lon, incidentLat, incidentLon);
+            if (dist > 100) {
+                setDistanceError(`Location Mismatch: You are ${Math.round(dist)}m away. Move to the site.`);
+                setIsWithinRange(false);
+            } else {
+                setDistanceError('');
+                setIsWithinRange(true);
+            }
+        }
+    };
+
+    const handlePhotoCaptured = (file: File) => {
+        setEvidence(file);
+        setPreviewUrl(URL.createObjectURL(file));
+
+        setGeoLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                validateLocation(pos.coords.latitude, pos.coords.longitude);
+                setGeoLoading(false);
+            },
+            (err) => {
+                setDistanceError('Geo-Validation Failed: GPS required for site evidence.');
+                setIsWithinRange(false);
+                setGeoLoading(false);
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Safety check if evidence is provided but range is failing
+        if (evidence && !isWithinRange) {
+            alert("Submission Blocked: Action can only be verified within 100m of the complaint location.");
+            return;
+        }
+
         setLoading(true);
         try {
             const formData = new FormData();
@@ -579,8 +732,12 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
             formData.append('changed_by', user?.id || '');
 
             if (evidence) {
-                // Attach the file AS 'proof' so the backend recognizes it for history/results
                 formData.append('proof', evidence);
+                // Also append the coordinates to the remarks if they exist
+                if (officerLocation) {
+                    formData.append('verified_lat', officerLocation.lat.toString());
+                    formData.append('verified_lon', officerLocation.lon.toString());
+                }
             }
 
             const res = await fetch(`/api/complaints/${complaintId}/status`, {
@@ -596,8 +753,8 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
             setSuccess(true);
             setRemarks('');
             setEvidence(null);
+            setOfficerLocation(null);
 
-            // Re-fetch or reload to show the updated timeline
             setTimeout(() => {
                 setSuccess(false);
                 onUpdate();
@@ -641,15 +798,72 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                📷 Add Evidence Photo
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                                <span>📷 SITE EVIDENCE</span>
+                                {geoLoading && <div className="w-2 h-2 rounded-full bg-[#FF9933] animate-ping" title="Verifying Geo-location..." />}
                             </label>
-                            <input type="file" accept="image/*"
-                                onChange={e => setEvidence(e.target.files?.[0] || null)}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-2 px-3 text-sm cursor-pointer file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#FF9933] file:text-white hover:file:bg-[#e67300]"
-                            />
+
+                            {!evidence ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCamera(true)}
+                                    className="w-full h-[88px] flex flex-col items-center justify-center gap-2 bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 hover:text-[#FF9933] hover:border-[#FF9933]/50 transition-all"
+                                >
+                                    <Camera size={24} />
+                                    <span className="text-[10px] font-black uppercase tracking-tighter">Open Camera to capture</span>
+                                </button>
+                            ) : (
+                                <div className="relative h-[88px] rounded-2xl overflow-hidden border-2 border-[#138808]/30 group">
+                                    <img src={previewUrl!} className="w-full h-full object-cover" alt="Preview" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setEvidence(null); setPreviewUrl(null); setShowCamera(true); }}
+                                            className="p-2 bg-white rounded-full text-slate-800 shadow-xl"
+                                        >
+                                            <Camera size={14} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setEvidence(null); setPreviewUrl(null); }}
+                                            className="p-2 bg-white rounded-full text-red-500 shadow-xl"
+                                        >
+                                            <ArrowLeft size={14} className="rotate-45" />
+                                        </button>
+                                    </div>
+                                    <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-[#138808] text-white text-[8px] font-black rounded uppercase">
+                                        Captured
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
+
+                    {showCamera && (
+                        <CameraModal
+                            onCapture={handlePhotoCaptured}
+                            onClose={() => setShowCamera(false)}
+                        />
+                    )}
+
+                    {/* Geolocation Feedback */}
+                    {distanceError && (
+                        <div className="p-3 rounded-xl bg-red-50 border border-red-100 flex items-start gap-2 animate-in slide-in-from-top-2">
+                            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                            <p className="text-[11px] font-bold text-red-700 leading-tight">
+                                {distanceError}
+                            </p>
+                        </div>
+                    )}
+
+                    {officerLocation && isWithinRange && (
+                        <div className="p-2.5 rounded-xl bg-green-50 border border-green-100 flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-[#138808]" />
+                            <p className="text-[10px] font-bold text-[#138808] uppercase tracking-wider">
+                                ✅ Site Location Verified (within 100m)
+                            </p>
+                        </div>
+                    )}
 
                     {/* Remarks */}
                     <div className="space-y-1.5">
@@ -664,14 +878,14 @@ const OfficerActionPanel: React.FC<{ complaintId: string; currentStatus: string;
                     </div>
 
                     {/* Submit */}
-                    <button type="submit" disabled={loading || success}
+                    <button type="submit" disabled={loading || success || !isWithinRange || (!!evidence && geoLoading)}
                         className="w-full py-3 rounded-xl font-black text-sm text-white uppercase tracking-wider shadow-sm hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                         style={{ backgroundColor: success ? '#138808' : '#FF9933' }}>
                         {loading
-                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Updating…</>
+                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Verifying & Updating…</>
                             : success
-                                ? <><CheckCircle2 size={15} /> Updated Successfully!</>
-                                : <><CheckCircle2 size={15} /> Confirm &amp; Publish Update</>}
+                                ? <><CheckCircle2 size={15} /> Published Successfully!</>
+                                : <><CheckCircle2 size={15} /> Confirm Site Action</>}
                     </button>
                 </form>
             </div>
