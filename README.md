@@ -147,4 +147,8 @@ This project is licensed under the [MIT License](LICENSE) - see the LICENSE file
 
 ---
 
-**Together, we're building a more transparent, accessible, and participatory India. Join us in bridging the gap between citizens and governance!**
+</div>
+
+
+
+jfinx ufhsifhxcinx
